@@ -10,7 +10,14 @@ import {IReceiver} from "./IReceiver.sol";
 ///         public RPC, recomputes every ~150 m area with KneeDeep's published fusion engine, agrees
 ///         on the result, and delivers it here through the Chainlink Forwarder.
 /// @dev Consensus proves the nodes agree on what the public evidence says, not that the human
-///      reports are true. Only the configured Forwarder may write; stale reports are discarded.
+///      reports are true. Only the configured Forwarder may write; stale and future-dated reports
+///      are discarded.
+///
+///      CRE's simulation forwarder (MockKeystoneForwarder, used by `cre workflow simulate
+///      --broadcast`) does not verify DON signatures: anyone could deliver any report through it.
+///      While using it, set `trustedSender` to the account that broadcasts the simulation, and only
+///      its transactions are accepted. With the production KeystoneForwarder, which verifies the
+///      DON's signatures, set `trustedSender` to address(0) and pin `expectedWorkflowOwner`.
 contract KneeDeepAttestations is IReceiver {
   /// @notice One area's recomputed answer.
   struct Area {
@@ -35,6 +42,14 @@ contract KneeDeepAttestations is IReceiver {
   address public forwarder;
   /// @notice If set, only reports from workflows owned by this address are accepted.
   address public expectedWorkflowOwner;
+  /// @notice If set, only transactions sent (tx.origin) by this account are accepted. For the
+  ///         simulation forwarder only, which checks no signatures; address(0) with the real one.
+  address public trustedSender;
+
+  /// @notice Reports may be dated at most this far ahead of the block: the workflow computes for the
+  ///         cron's scheduled time, which can be a few minutes ahead. A far-future report would
+  ///         otherwise make every later, genuine report "stale".
+  uint64 public constant MAX_FUTURE_SECONDS = 15 minutes;
 
   uint256 public attestationCount;
   Attestation private s_latest;
@@ -51,19 +66,24 @@ contract KneeDeepAttestations is IReceiver {
   event ForwarderUpdated(address previous, address current);
   event ExpectedWorkflowOwnerUpdated(address previous, address current);
   event OwnershipTransferred(address previous, address current);
+  event TrustedSenderUpdated(address previous, address current);
 
   error NotForwarder(address sender);
   error NotOwner(address sender);
   error ZeroAddress();
   error StaleReport(uint64 asOf, uint64 latestAsOf);
   error WrongWorkflowOwner(address received, address expected);
+  error UntrustedSender(address sender);
+  error FutureReport(uint64 asOf, uint64 blockTime);
 
-  constructor(address forwarder_) {
+  constructor(address forwarder_, address trustedSender_) {
     if (forwarder_ == address(0)) revert ZeroAddress();
     owner = msg.sender;
     forwarder = forwarder_;
+    trustedSender = trustedSender_;
     emit OwnershipTransferred(address(0), msg.sender);
     emit ForwarderUpdated(address(0), forwarder_);
+    emit TrustedSenderUpdated(address(0), trustedSender_);
   }
 
   modifier onlyOwner() {
@@ -74,6 +94,10 @@ contract KneeDeepAttestations is IReceiver {
   /// @inheritdoc IReceiver
   function onReport(bytes calldata metadata, bytes calldata report) external override {
     if (msg.sender != forwarder) revert NotForwarder(msg.sender);
+    // Only meaningful with the simulation forwarder (see the contract notes). tx.origin is the only
+    // sender information a receiver gets through a forwarder.
+    // solhint-disable-next-line avoid-tx-origin
+    if (trustedSender != address(0) && tx.origin != trustedSender) revert UntrustedSender(tx.origin);
     if (expectedWorkflowOwner != address(0)) {
       address workflowOwner = _workflowOwner(metadata);
       if (workflowOwner != expectedWorkflowOwner) revert WrongWorkflowOwner(workflowOwner, expectedWorkflowOwner);
@@ -82,6 +106,7 @@ contract KneeDeepAttestations is IReceiver {
     Attestation memory a = abi.decode(report, (Attestation));
     // Receivers must discard stale reports: never let an older answer overwrite a newer one.
     if (attestationCount > 0 && a.asOf <= s_latest.asOf) revert StaleReport(a.asOf, s_latest.asOf);
+    if (a.asOf > block.timestamp + MAX_FUTURE_SECONDS) revert FutureReport(a.asOf, uint64(block.timestamp));
 
     s_latest.asOf = a.asOf;
     s_latest.arkivBlock = a.arkivBlock;
@@ -112,6 +137,12 @@ contract KneeDeepAttestations is IReceiver {
   function setExpectedWorkflowOwner(address workflowOwner) external onlyOwner {
     emit ExpectedWorkflowOwnerUpdated(expectedWorkflowOwner, workflowOwner);
     expectedWorkflowOwner = workflowOwner;
+  }
+
+  /// @notice The only account whose transactions may deliver reports (address(0) disables the check).
+  function setTrustedSender(address sender) external onlyOwner {
+    emit TrustedSenderUpdated(trustedSender, sender);
+    trustedSender = sender;
   }
 
   function transferOwnership(address newOwner) external onlyOwner {

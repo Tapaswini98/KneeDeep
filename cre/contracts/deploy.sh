@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
 # Deploy KneeDeepAttestations to Sepolia.
-#   ./deploy.sh              forwarder = CRE's simulation MockKeystoneForwarder (cre workflow simulate --broadcast)
-#   ./deploy.sh production   forwarder = CRE's KeystoneForwarder (a deployed workflow)
+#   ./deploy.sh              forwarder = CRE's simulation MockKeystoneForwarder (cre workflow simulate --broadcast).
+#                            It checks no signatures, so only the deployer's own transactions are accepted.
+#   ./deploy.sh production   forwarder = CRE's KeystoneForwarder (a deployed workflow), which verifies the
+#                            DON's signatures; then pin the workflow owner with setExpectedWorkflowOwner.
 # Needs CRE_ETH_PRIVATE_KEY (a testnet key with a little Sepolia ETH) in cre/.env, and optionally
 # CRE_DEPLOYER_ADDRESS to make sure the key is the one you meant to use.
 # Forwarders per chain: `cre workflow supported-chains`.
@@ -12,7 +14,12 @@ cd "$(dirname "$0")"
 
 MOCK_FORWARDER=0x15fC6ae953E024d975e77382eEeC56A9101f9F88
 FORWARDER=0xF8344CFd5c43616a4366C34E3EEE75af79a74482
-[ "${1:-}" = "production" ] || FORWARDER=$MOCK_FORWARDER
+if [ "${1:-}" = "production" ]; then
+  TRUSTED_SENDER=0x0000000000000000000000000000000000000000
+else
+  FORWARDER=$MOCK_FORWARDER
+  TRUSTED_SENDER=deployer
+fi
 RPC=${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}
 
 # Accept the key with or without 0x.
@@ -37,12 +44,15 @@ if [ "$BALANCE" = "0" ]; then
   exit 1
 fi
 
+[ "$TRUSTED_SENDER" = deployer ] && TRUSTED_SENDER=$DEPLOYER
+
 echo "Deploying KneeDeepAttestations to Sepolia"
-echo "  deployer   $DEPLOYER ($(cast from-wei "$BALANCE") ETH)"
-echo "  forwarder  $FORWARDER"
+echo "  deployer        $DEPLOYER ($(cast from-wei "$BALANCE") ETH)"
+echo "  forwarder       $FORWARDER"
+echo "  trusted sender  $TRUSTED_SENDER"
 forge create src/KneeDeepAttestations.sol:KneeDeepAttestations \
   --rpc-url "$RPC" --private-key "$KEY" --broadcast \
-  --constructor-args "$FORWARDER"
+  --constructor-args "$FORWARDER" "$TRUSTED_SENDER"
 echo
 echo "Next: put the 'Deployed to' address in"
 echo "  cre/kneedeep-verify/config.staging.json   attestationsAddress"

@@ -5,6 +5,6 @@
   "maxAreas": 25,
   "maxPages": 3,
   "chainSelectorName": "ethereum-testnet-sepolia",
-  "attestationsAddress": "0x1767F0c121c9D966eAB14050e94CD85f68D4fA8b",
+  "attestationsAddress": "0x4e3EA1Cb0b48e146E0615A02F425c87A42180834",
   "gasLimit": "9000000"
 }

@@ -146,6 +146,12 @@ requires identical results before signing a report that the Forwarder delivers t
 `KneeDeepAttestations` on Sepolia. The API then recomputes its own answer for the attested areas
 through its own data path and reports match or mismatch per area; the dashboard shows it.
 
+Who may write matters as much as what is written. The hackathon deployment is driven by
+`cre workflow simulate --broadcast`, whose forwarder verifies no DON signatures, so the contract also
+requires the transaction to come from one trusted sender and refuses reports dated in the future (a
+forged report dated 2100 would otherwise lock out every genuine one). A workflow deployed to the DON
+uses the production Forwarder, which verifies the DON's signatures, with the workflow owner pinned.
+
 Determinism comes from computing for the cron's scheduled time rather than each node's clock, and
 from canonical ordering of areas and evidence keys. Arkiv queries cannot be pinned to a block, so a
 write landing between two nodes' reads fails that round's consensus instead of producing a wrong

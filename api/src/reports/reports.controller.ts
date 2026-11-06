@@ -51,6 +51,7 @@ export class ReportsController {
 
   /** Free: live reports near a point (the same data anyone can read from Arkiv directly). */
   @Get()
+  @Throttle({ default: { ttl: 60_000, limit: 60 } }) // an Arkiv read each; the map polls every 10 s
   live(@Query() query: unknown) {
     const q = parse(liveReportsQuerySchema, query);
     return this.reports.live(q.lat, q.lng, q.radius);

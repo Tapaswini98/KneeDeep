@@ -5,6 +5,9 @@ import { LEVELS, type Level } from '../arkiv/vocabulary';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { fuse } from '../fusion/fusion';
 
+/** Same bound as KneeDeepAttestations.MAX_FUTURE_SECONDS: the cron's next run can be minutes ahead. */
+const MAX_FUTURE_SECONDS = 15 * 60;
+
 /** KneeDeepAttestations.latest() (cre/contracts/src/KneeDeepAttestations.sol). */
 const ABI = [
   {
@@ -115,6 +118,10 @@ export class VerificationService {
     if (count === 0n) return { enabled: false, reason: 'No attestation yet' };
 
     const asOf = Number(a.asOf);
+    // The contract refuses these too; never show a future-dated attestation as verification.
+    if (asOf > Date.now() / 1000 + MAX_FUTURE_SECONDS) {
+      return { enabled: false, reason: 'The latest attestation is dated in the future; ignored' };
+    }
     const cells = a.areas.map((x) => x.cell);
     // KneeDeep's own answer for the same areas, through this server's data path, at the same time.
     const ours = new Map<string, { level: Level | null; confidence: number }>();

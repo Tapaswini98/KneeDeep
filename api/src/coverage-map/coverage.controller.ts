@@ -1,4 +1,5 @@
 import { BadRequestException, Controller, Get, Inject, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ArkivStore } from '../arkiv/arkiv.store';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { coverageState } from '../fusion/coverage';
@@ -43,7 +44,9 @@ export class CoverageController {
     private readonly store: ArkivStore,
   ) {}
 
+  // Every new view is an Arkiv read: a map polling every 15 s while panning needs far less than this.
   @Get()
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
   coverage(@Query('bbox') raw?: string) {
     const requested = parseBbox(raw);
     const bbox = clipToMumbai(requested);
