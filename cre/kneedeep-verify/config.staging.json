@@ -2,9 +2,9 @@
   "schedule": "0 */5 * * * *",
   "arkivRpcUrl": "https://rpc.rabdi.db-chain.testnet.arkiv.network",
   "kneedeepWriter": "0x17caA788b2229bDF7F4E057191E62CF7f7bD2085",
-  "maxAreas": 40,
+  "maxAreas": 25,
   "maxPages": 3,
   "chainSelectorName": "ethereum-testnet-sepolia",
-  "attestationsAddress": "",
-  "gasLimit": "3000000"
+  "attestationsAddress": "0x1767F0c121c9D966eAB14050e94CD85f68D4fA8b",
+  "gasLimit": "9000000"
 }

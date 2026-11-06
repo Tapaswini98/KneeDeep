@@ -55,6 +55,14 @@ npm run cre:simulate:broadcast   # recompute, reach consensus, write the attesta
 For a deployed workflow, redeploy with `./cre/contracts/deploy.sh production` (CRE's
 KeystoneForwarder) and optionally pin the workflow owner with `setExpectedWorkflowOwner`.
 
+## Live on Sepolia
+
+| What                        | Where                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `KneeDeepAttestations`      | [0x1767F0c121c9D966eAB14050e94CD85f68D4fA8b](https://sepolia.etherscan.io/address/0x1767F0c121c9D966eAB14050e94CD85f68D4fA8b) |
+| Forwarder (simulation)      | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` (CRE's MockKeystoneForwarder)                                                    |
+| First attestation (9 areas) | [0x1ae6451c…](https://sepolia.etherscan.io/tx/0x1ae6451cc1ddc41024ba159ed79dc5bde30c85666290e8137c231b65ce4a8ac0)             |
+
 ## Simulation log
 
 ```
@@ -74,7 +82,10 @@ KeystoneForwarder) and optionally pin the workflow owner with `setExpectedWorkfl
   areas and evidence keys canonically, and returns one JSON string; consensus requires identical
   strings. Arkiv queries cannot be pinned to a block, so a report landing between two nodes' reads
   fails that round's consensus; the next round (5 min) succeeds. Nothing wrong is ever written.
-- **Bounded.** At most `maxPages` × 100 entities per query and `maxAreas` areas per attestation
-  (worst first), within CRE's HTTP, consensus and gas limits (40 areas ≈ 2.3M gas).
+- **Bounded.** At most `maxPages` × 100 entities per query and `maxAreas` (25) areas per
+  attestation (worst first), within CRE's HTTP, consensus and gas limits. Measured on Sepolia: an
+  attestation that only overwrites existing area slots costs ~0.38M gas for 9 areas; each area beyond
+  the most ever stored creates storage once, ~0.26M gas. 25 new areas stay under the 9M `gasLimit`
+  (CRE's chain-write cap is 10M).
 - **Receiver safety.** Only the configured Forwarder can write; an older report never overwrites a
   newer one; the workflow owner can be pinned from the Forwarder metadata.
