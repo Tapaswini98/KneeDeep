@@ -53,7 +53,7 @@ export class SessionsService {
     const payload = b64(JSON.stringify({ sub: pseudonym, m: human.method, exp } satisfies Claims));
     return {
       token: `${payload}.${this.sign(payload)}`,
-      reporter: pseudonym.slice(0, 12),
+      reporter: pseudonym.slice(0, 12), // same as reporterTag(), shown publicly on the map
       method: human.method,
       source: human.method === 'world' ? 'live' : 'simulated',
       expiresAt: new Date(exp * 1000).toISOString(),

@@ -26,7 +26,8 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "simulate": "npm run simulate -w api --"
+    "simulate": "npm run simulate -w api --",
+    "arkiv:query": "npm run arkiv:query -w api --"
   },
   "devDependencies": {
     "concurrently": "9.2.1",

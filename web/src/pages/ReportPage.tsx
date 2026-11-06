@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { VerifyHuman } from '../components/VerifyHuman';
-import { api, ApiError, LiveReport } from '../lib/api';
-import { loadSession, ReporterSession, saveSession } from '../lib/identity';
+import { castVote, currentPosition, errorText, submitReport, voteBlocker } from '../lib/actions';
+import { api, ApiError, LiveReport, LiveReports } from '../lib/api';
 import { DEMO_SPOTS, Level, LEVELS } from '../lib/levels';
+import { useSession } from '../lib/session';
 
 type Position = { lat: number; lng: number; accuracy: number; label?: string };
-type Status = { kind: 'ok' | 'error'; text: string } | null;
+type Status = { kind: 'ok' | 'error'; text: string; link?: string } | null;
 
 const levelInfo = (id: string) => LEVELS.find((l) => l.id === id);
 
@@ -14,35 +15,23 @@ const levelInfo = (id: string) => LEVELS.find((l) => l.id === id);
  * like and confirm or dispute what others nearby reported.
  */
 export function ReportPage() {
-  const [session, setSession] = useState<ReporterSession | null>(loadSession);
+  const { session, setSession, signOut } = useSession();
   const [level, setLevel] = useState<Level | null>(null);
   const [position, setPosition] = useState<Position | null>(null);
   const [locating, setLocating] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [submitting, setSubmitting] = useState(false);
   const [nearby, setNearby] = useState<LiveReport[]>([]);
-  const [voting, setVoting] = useState<string | null>(null);
-
-  const onVerified = (s: ReporterSession) => {
-    saveSession(s);
-    setSession(s);
-    setStatus({ kind: 'ok', text: s.method === 'world' ? 'Verified as a unique human.' : 'Dev identity (SIMULATED data).' });
-  };
-
-  const signOut = () => {
-    saveSession(null);
-    setSession(null);
-  };
 
   /** A 401 means the session is gone or expired: ask the person to verify again. */
-  const handleError = (err: unknown) => {
+  const fail = (err: unknown): Status => {
     if (err instanceof ApiError && err.status === 401) signOut();
-    setStatus({ kind: 'error', text: err instanceof ApiError ? err.message : 'Could not reach the API.' });
+    return { kind: 'error', text: errorText(err) };
   };
 
   const loadNearby = useCallback(async (p: Position) => {
     try {
-      const res = await api<{ reports: LiveReport[] }>(`/v1/reports?lat=${p.lat}&lng=${p.lng}&radius=1000`);
+      const res = await api<LiveReports>(`/v1/reports?lat=${p.lat}&lng=${p.lng}&radius=1000`);
       setNearby(res.reports);
     } catch {
       setNearby([]);
@@ -53,23 +42,15 @@ export function ReportPage() {
     if (position) void loadNearby(position);
   }, [position, loadNearby]);
 
-  const locate = () => {
-    if (!navigator.geolocation) {
-      setStatus({ kind: 'error', text: 'This browser cannot share location.' });
-      return;
-    }
+  const locate = async () => {
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        setPosition({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
-        setLocating(false);
-      },
-      (err) => {
-        setStatus({ kind: 'error', text: `Location unavailable: ${err.message}` });
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15_000 },
-    );
+    try {
+      setPosition(await currentPosition());
+    } catch (err) {
+      setStatus({ kind: 'error', text: errorText(err) });
+    } finally {
+      setLocating(false);
+    }
   };
 
   const submit = async () => {
@@ -77,38 +58,15 @@ export function ReportPage() {
     setSubmitting(true);
     setStatus(null);
     try {
-      const r = await api<{ expiresAt: string; source: string }>('/v1/reports', {
-        method: 'POST',
-        token: session.token,
-        body: JSON.stringify({ level, lat: position.lat, lng: position.lng }),
-      });
+      const r = await submitReport(session, { level, lat: position.lat, lng: position.lng });
       const until = new Date(r.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setStatus({ kind: 'ok', text: `Report saved on Arkiv. It stays live until ${until}, then disappears.` });
+      setStatus({ kind: 'ok', text: `Report saved on Arkiv. It stays live until ${until}, then disappears.`, link: r.explorer });
       setLevel(null);
       await loadNearby(position);
     } catch (err) {
-      handleError(err);
+      setStatus(fail(err));
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const vote = async (report: LiveReport, v: 'confirm' | 'dispute') => {
-    if (!position || !session) return;
-    setVoting(report.key);
-    setStatus(null);
-    try {
-      await api(`/v1/reports/${report.key}/votes`, {
-        method: 'POST',
-        token: session.token,
-        body: JSON.stringify({ vote: v, lat: position.lat, lng: position.lng }),
-      });
-      setStatus({ kind: 'ok', text: v === 'confirm' ? 'Thanks: confirmed.' : 'Thanks: disputed.' });
-      await loadNearby(position);
-    } catch (err) {
-      handleError(err);
-    } finally {
-      setVoting(null);
     }
   };
 
@@ -117,10 +75,11 @@ export function ReportPage() {
       <h2>What does the street look like right now?</h2>
 
       {!session ? (
-        <VerifyHuman onVerified={onVerified} />
+        <VerifyHuman onVerified={setSession} />
       ) : (
         <p className="muted session">
-          {session.method === 'world' ? 'Verified human' : 'Dev identity (simulated)'} · reporter {session.reporter}…{' '}
+          {session.method === 'world' ? 'Verified human' : 'Dev identity (simulated)'} · reporter{' '}
+          <code>{session.reporter}</code>{' '}
           <button className="link" onClick={signOut}>
             sign out
           </button>
@@ -145,13 +104,17 @@ export function ReportPage() {
       </div>
 
       <button className="secondary" onClick={locate} disabled={locating}>
-        {locating ? 'Locating…' : position ? 'Update location' : 'Share my location'}
+        {locating ? 'Locating…' : position && !position.label ? 'Update location' : 'Share my location'}
       </button>
       {session?.method === 'dev' && (
         <div className="demo-spots">
           <span className="muted small">Dev mode: report from a demo spot</span>
           {DEMO_SPOTS.map((s) => (
-            <button key={s.name} className="chip" onClick={() => setPosition({ lat: s.lat, lng: s.lng, accuracy: 0, label: s.name })}>
+            <button
+              key={s.name}
+              className={`chip ${position?.label === s.name ? 'selected' : ''}`}
+              onClick={() => setPosition({ lat: s.lat, lng: s.lng, accuracy: 0, label: s.name })}
+            >
               {s.name}
             </button>
           ))}
@@ -170,34 +133,100 @@ export function ReportPage() {
         {submitting ? 'Saving to Arkiv…' : 'Submit report'}
       </button>
 
-      {status && <p className={`notice ${status.kind}`}>{status.text}</p>}
+      {status && (
+        <p className={`notice ${status.kind}`}>
+          {status.text}{' '}
+          {status.link && (
+            <a href={status.link} target="_blank" rel="noreferrer">
+              View on Arkiv
+            </a>
+          )}
+        </p>
+      )}
 
       {position && (
         <section className="nearby">
           <h3>Live reports within 1 km</h3>
           {nearby.length === 0 && <p className="muted">None right now.</p>}
           {nearby.map((r) => (
-            <div key={r.key} className="nearby-item">
-              <span className="swatch" style={{ background: levelInfo(r.level)?.color }} />
-              <div className="nearby-text">
-                <strong>{levelInfo(r.level)?.label ?? r.level}</strong>
-                <small>
-                  {Math.round(r.ageMin)} min ago · +{r.confirmations} / −{r.disputes}
-                  {r.source === 'simulated' && ' · SIMULATED'}
-                </small>
-              </div>
-              <div className="nearby-actions">
-                <button disabled={!session || voting === r.key} onClick={() => vote(r, 'confirm')}>
-                  Confirm
-                </button>
-                <button disabled={!session || voting === r.key} onClick={() => vote(r, 'dispute')}>
-                  Dispute
-                </button>
-              </div>
-            </div>
+            <NearbyItem
+              key={r.key}
+              report={r}
+              position={position}
+              onVoted={() => loadNearby(position)}
+              onUnauthorized={signOut}
+            />
           ))}
         </section>
       )}
+    </div>
+  );
+}
+
+function NearbyItem({
+  report: r,
+  position,
+  onVoted,
+  onUnauthorized,
+}: {
+  report: LiveReport;
+  position: Position;
+  onVoted: () => void;
+  onUnauthorized: () => void;
+}) {
+  const { session } = useSession();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Status>(null);
+  const blocked = voteBlocker(session, r);
+
+  const vote = async (v: 'confirm' | 'dispute') => {
+    if (!session) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await castVote(session, r.key, v, { lat: position.lat, lng: position.lng });
+      setMsg({ kind: 'ok', text: v === 'confirm' ? 'Confirmed.' : 'Disputed.', link: res.explorer });
+      onVoted();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) onUnauthorized();
+      setMsg({ kind: 'error', text: errorText(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="nearby-item">
+      <span className="swatch" style={{ background: levelInfo(r.level)?.color }} />
+      <div className="nearby-text">
+        <strong>{levelInfo(r.level)?.label ?? r.level}</strong>
+        <small>
+          {Math.round(r.ageMin)} min ago · +{r.confirmations} / −{r.disputes} · expires in {Math.round(r.expiresInMin)} min
+          {r.source === 'simulated' && ' · SIMULATED'}
+        </small>
+        {msg && (
+          <small className={msg.kind === 'error' ? 'err' : 'ok'}>
+            {msg.text}{' '}
+            {msg.link && (
+              <a href={msg.link} target="_blank" rel="noreferrer">
+                Arkiv
+              </a>
+            )}
+          </small>
+        )}
+      </div>
+      <div className="nearby-actions">
+        {blocked ? (
+          <span className="muted small">{blocked}</span>
+        ) : busy ? (
+          <span className="muted small">Saving…</span>
+        ) : (
+          <>
+            <button onClick={() => vote('confirm')}>Confirm</button>
+            <button onClick={() => vote('dispute')}>Dispute</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -52,6 +52,28 @@ Example paid answer (simulated data):
 
 How confidence is computed: [docs/design.md](docs/design.md).
 
+## Data on Arkiv
+
+Every report and vote is a public, expiring entity on Arkiv's Rabdi testnet, owned by the
+KneeDeep writer wallet:
+
+- Writer: [`0x17caA788b2229bDF7F4E057191E62CF7f7bD2085`](https://rabdi.explorer.arkiv.network/address/0x17caA788b2229bDF7F4E057191E62CF7f7bD2085)
+- Schema: [arkiv/schema.md](arkiv/schema.md)
+
+Read it without the KneeDeep API (only the public SDK and the writer address):
+
+```bash
+npm run arkiv:query                                   # live reports + votes in Mumbai (geohash te7…)
+npm run arkiv:query -- 0x17caA788b2229bDF7F4E057191E62CF7f7bD2085 te7uc8   # around Andheri
+```
+
+The query it runs:
+
+```ts
+client.select({ $key: true, $expiresAt: true, level: true, cell: true, reportedAt: true, source: true })
+  .from(Reports).where(startsWith('cell', 'te7')).ownedBy(WRITER).orderBy(asc('$expiresAt')).limit(100).fetch()
+```
+
 ## Payment flow (x402 on Hedera)
 
 ```

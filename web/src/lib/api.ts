@@ -52,6 +52,19 @@ export interface LiveReport {
   ageMin: number;
   confirmations: number;
   disputes: number;
+  /** Prefix of the reporter's pseudonym; equals ReporterSession.reporter for your own reports. */
+  reporter: string;
+  voters: { voter: string; vote: 'confirm' | 'dispute' }[];
+  expiresInMin: number;
+  explorer: { entity: string; tx: string | null };
+}
+
+export interface LiveReports {
+  generatedAt: string;
+  arkivBlock: string;
+  writer: string | null;
+  writerExplorer: string | null;
+  reports: LiveReport[];
 }
 
 export interface AreaSummary {

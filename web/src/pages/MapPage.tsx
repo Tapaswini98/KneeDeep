@@ -1,6 +1,10 @@
-import { Circle, CircleMarker, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet';
-import { Activity, AgentQuery, api, formatHbar, LiveReport } from '../lib/api';
-import { LEVELS, MUMBAI_CENTER } from '../lib/levels';
+import { useEffect, useState } from 'react';
+import { Circle, CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { VerifyHuman } from '../components/VerifyHuman';
+import { castVote, errorText, submitReport, voteBlocker, voterPosition } from '../lib/actions';
+import { Activity, AgentQuery, api, formatHbar, LiveReport, LiveReports } from '../lib/api';
+import { Level, LEVELS, MUMBAI_CENTER } from '../lib/levels';
+import { useSession } from '../lib/session';
 import { usePolling } from '../lib/usePolling';
 
 const MAX_AGE_MIN = 180;
@@ -16,19 +20,30 @@ const timeAgo = (iso: string) => {
   return `${Math.floor(min / 60)} h ${Math.round(min % 60)} min ago`;
 };
 
+type Point = { lat: number; lng: number };
+type Notice = { kind: 'ok' | 'error'; text: string; link?: string } | null;
+
 export function MapPage() {
+  const { session, setSession } = useSession();
   const reports = usePolling(
-    () =>
-      api<{ reports: LiveReport[]; arkivBlock: string }>(
-        `/v1/reports?lat=${MUMBAI_CENTER[0]}&lng=${MUMBAI_CENTER[1]}&radius=20000`,
-      ),
+    () => api<LiveReports>(`/v1/reports?lat=${MUMBAI_CENTER[0]}&lng=${MUMBAI_CENTER[1]}&radius=20000`),
     10_000,
   );
   const activity = usePolling(() => api<Activity>('/v1/activity?limit=15'), 10_000);
 
-  const live = reports.data?.reports ?? [];
+  const [layers, setLayers] = useState({ live: true, simulated: true, queries: true });
+  const [draft, setDraft] = useState<Point | null>(null);
+  const [flyTo, setFlyTo] = useState<Point | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
+
+  const all = reports.data?.reports ?? [];
+  const live = all.filter((r) => (r.source === 'simulated' ? layers.simulated : layers.live));
   const queries = activity.data?.queries ?? [];
-  const simulated = live.some((r) => r.source === 'simulated');
+
+  const afterAction = (n: Notice) => {
+    setNotice(n);
+    void reports.refresh();
+  };
 
   return (
     <div className="map-page">
@@ -37,17 +52,21 @@ export function MapPage() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <ClickToReport onClick={setDraft} />
+        <FlyTo target={flyTo} />
 
-        {queries.slice(0, 5).map((q) => (
-          <Circle
-            key={q.id}
-            center={[q.lat, q.lng]}
-            radius={q.radiusM}
-            pathOptions={{ color: '#1f8fd1', weight: 1, dashArray: '4 4', fillOpacity: 0.04 }}
-          >
-            <Tooltip>Agent query · {timeAgo(q.createdAt)}</Tooltip>
-          </Circle>
-        ))}
+        {layers.queries &&
+          queries.slice(0, 5).map((q) => (
+            <Circle
+              key={q.id}
+              center={[q.lat, q.lng]}
+              radius={q.radiusM}
+              pathOptions={{ color: '#1f8fd1', weight: 1, dashArray: '4 4', fillOpacity: 0.04 }}
+              eventHandlers={{ click: (e) => e.originalEvent.stopPropagation() }}
+            >
+              <Tooltip>Agent query · {timeAgo(q.createdAt)}</Tooltip>
+            </Circle>
+          ))}
 
         {live.map((r) => {
           const info = levelInfo(r.level);
@@ -65,28 +84,68 @@ export function MapPage() {
                 weight: 2,
                 dashArray: r.source === 'simulated' ? '3 3' : undefined,
               }}
+              bubblingMouseEvents={false}
             >
-              <Popup>
-                <strong>{info?.label ?? r.level}</strong> · {Math.round(r.ageMin)} min ago
-                <br />+{r.confirmations} confirm · −{r.disputes} dispute
-                <br />
-                {r.source === 'simulated' ? 'SIMULATED demo data' : 'Live, World ID-verified reporter'}
-                <br />
-                <code title={r.key}>{r.key.slice(0, 10)}…</code> on Arkiv
+              <Tooltip>
+                {info?.label} · {Math.round(r.ageMin)} min ago
+              </Tooltip>
+              <Popup minWidth={240}>
+                <ReportPopup report={r} onDone={afterAction} />
               </Popup>
             </CircleMarker>
           );
         })}
+
+        {draft && (
+          <Popup position={[draft.lat, draft.lng]} eventHandlers={{ remove: () => setDraft(null) }}>
+            <DraftPopup
+              at={draft}
+              onDone={(n) => {
+                setDraft(null);
+                afterAction(n);
+              }}
+            />
+          </Popup>
+        )}
       </MapContainer>
 
       <aside className="panel">
-        {simulated && <p className="banner">Includes SIMULATED demo data (dashed markers).</p>}
+        {all.some((r) => r.source === 'simulated') && (
+          <p className="banner">Includes SIMULATED demo data (dashed markers).</p>
+        )}
+
+        <section>
+          <h3>You</h3>
+          {session ? (
+            <p className="small">
+              {session.method === 'world' ? 'Verified human' : 'Dev identity (simulated)'} · reporter{' '}
+              <code>{session.reporter}</code>
+              <br />
+              <span className="muted">
+                Click a marker to confirm or dispute it.
+                {session.method === 'dev' ? ' Click anywhere on the map to report there.' : ''}
+              </span>
+            </p>
+          ) : (
+            <VerifyHuman onVerified={setSession} />
+          )}
+          {notice && (
+            <p className={`notice ${notice.kind} small`}>
+              {notice.text}{' '}
+              {notice.link && (
+                <a href={notice.link} target="_blank" rel="noreferrer">
+                  View on Arkiv
+                </a>
+              )}
+            </p>
+          )}
+        </section>
 
         <section>
           <h3>Live now</h3>
           <div className="stats">
             <div>
-              <strong>{live.length}</strong>
+              <strong>{all.length}</strong>
               <span>live reports</span>
             </div>
             <div>
@@ -100,13 +159,35 @@ export function MapPage() {
           </div>
           <p className="muted small">
             Arkiv block {reports.data?.arkivBlock ?? '…'}
-            {reports.updatedAt && ` · updated ${reports.updatedAt.toLocaleTimeString()}`}
+            {reports.data?.writerExplorer && (
+              <>
+                {' · '}
+                <a href={reports.data.writerExplorer} target="_blank" rel="noreferrer">
+                  all entities on Arkiv
+                </a>
+              </>
+            )}
+            {reports.updatedAt && ` · ${reports.updatedAt.toLocaleTimeString()}`}
           </p>
-          {(reports.error || activity.error) && <p className="notice error">{reports.error ?? activity.error}</p>}
+          {(reports.error || activity.error) && <p className="notice error small">{reports.error ?? activity.error}</p>}
         </section>
 
         <section>
-          <h3>Water level</h3>
+          <h3>Layers</h3>
+          <div className="toggles">
+            {(
+              [
+                ['live', 'Live (verified)'],
+                ['simulated', 'Simulated'],
+                ['queries', 'Agent queries'],
+              ] as const
+            ).map(([k, label]) => (
+              <label key={k}>
+                <input type="checkbox" checked={layers[k]} onChange={(e) => setLayers({ ...layers, [k]: e.target.checked })} />
+                {label}
+              </label>
+            ))}
+          </div>
           <ul className="legend-list">
             {LEVELS.map((l) => (
               <li key={l.id}>
@@ -115,14 +196,14 @@ export function MapPage() {
               </li>
             ))}
           </ul>
-          <p className="muted small">Markers fade with age and disappear when the report expires (3 h).</p>
+          <p className="muted small">Markers fade with age and disappear when the report expires on Arkiv.</p>
         </section>
 
         <section>
           <h3>Agent queries</h3>
           {queries.length === 0 && <p className="muted small">None yet. Run: npm run agent</p>}
           {queries.map((q) => (
-            <QueryCard key={q.id} q={q} />
+            <QueryCard key={q.id} q={q} onSelect={() => setFlyTo({ lat: q.lat, lng: q.lng })} />
           ))}
         </section>
       </aside>
@@ -130,11 +211,133 @@ export function MapPage() {
   );
 }
 
-function QueryCard({ q }: { q: AgentQuery }) {
+function ClickToReport({ onClick }: { onClick: (p: Point) => void }) {
+  useMapEvents({ click: (e) => onClick({ lat: e.latlng.lat, lng: e.latlng.lng }) });
+  return null;
+}
+
+function FlyTo({ target }: { target: Point | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (target) map.flyTo([target.lat, target.lng], 16, { duration: 0.8 });
+  }, [map, target]);
+  return null;
+}
+
+function ReportPopup({ report: r, onDone }: { report: LiveReport; onDone: (n: Notice) => void }) {
+  const { session } = useSession();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Notice>(null);
+  const info = levelInfo(r.level);
+  const blocked = voteBlocker(session, r);
+
+  const vote = async (v: 'confirm' | 'dispute') => {
+    if (!session) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const at = await voterPosition(session, r);
+      const res = await castVote(session, r.key, v, at);
+      const n = { kind: 'ok' as const, text: v === 'confirm' ? 'Confirmed.' : 'Disputed.', link: res.explorer };
+      setMsg(n);
+      onDone(n);
+    } catch (err) {
+      setMsg({ kind: 'error', text: errorText(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="popup">
+      <div className="popup-title">
+        <span className="swatch" style={{ background: info?.color }} />
+        <strong>{info?.label ?? r.level}</strong>
+        <span className="muted">{Math.round(r.ageMin)} min ago</span>
+      </div>
+      <div className="small">
+        +{r.confirmations} confirm · −{r.disputes} dispute · expires in {Math.round(r.expiresInMin)} min
+      </div>
+      <div className="small">
+        {r.source === 'simulated' ? 'SIMULATED demo data' : 'Live, World ID-verified reporter'} · reporter{' '}
+        <code>{r.reporter}</code>
+      </div>
+      <div className="small">
+        <a href={r.explorer.entity} target="_blank" rel="noreferrer">
+          Entity on Arkiv
+        </a>
+        {r.explorer.tx && (
+          <>
+            {' · '}
+            <a href={r.explorer.tx} target="_blank" rel="noreferrer">
+              Write tx
+            </a>
+          </>
+        )}
+      </div>
+      <div className="popup-actions">
+        <button disabled={busy || !!blocked} onClick={() => vote('confirm')}>
+          Confirm
+        </button>
+        <button disabled={busy || !!blocked} onClick={() => vote('dispute')}>
+          Dispute
+        </button>
+        {blocked && <span className="muted small">{blocked}</span>}
+        {busy && <span className="muted small">Writing to Arkiv…</span>}
+      </div>
+      {msg && <p className={`notice ${msg.kind} small`}>{msg.text}</p>}
+    </div>
+  );
+}
+
+function DraftPopup({ at, onDone }: { at: Point; onDone: (n: Notice) => void }) {
+  const { session } = useSession();
+  const [busy, setBusy] = useState<Level | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!session) return <p className="small">Verify in the side panel first, then click the map to report.</p>;
+  if (session.method === 'world') {
+    // A verified human's report must come from where they actually are.
+    return (
+      <p className="small">
+        Live reports use your real location. Open <a href="/report">Report</a> on your phone at the spot.
+      </p>
+    );
+  }
+
+  const report = async (level: Level) => {
+    setBusy(level);
+    setError(null);
+    try {
+      const r = await submitReport(session, { level, ...at });
+      onDone({ kind: 'ok', text: `Reported ${level} (simulated).`, link: r.explorer });
+    } catch (err) {
+      setError(errorText(err));
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="popup">
+      <strong>Report here (simulated)</strong>
+      <div className="popup-levels">
+        {LEVELS.map((l) => (
+          <button key={l.id} disabled={!!busy} onClick={() => report(l.id)} style={{ borderColor: l.color }}>
+            <span className="swatch" style={{ background: l.color }} />
+            {busy === l.id ? 'Saving…' : l.label}
+          </button>
+        ))}
+      </div>
+      {error && <p className="notice error small">{error}</p>}
+    </div>
+  );
+}
+
+function QueryCard({ q, onSelect }: { q: AgentQuery; onSelect: () => void }) {
   const worst = q.summary[0];
   const info = levelInfo(worst?.level ?? null);
   return (
-    <div className="query">
+    <div className="query" role="button" tabIndex={0} onClick={onSelect} onKeyDown={(e) => e.key === 'Enter' && onSelect()}>
       <div className="query-head">
         <span>{timeAgo(q.createdAt)}</span>
         {q.paid ? (
@@ -162,7 +365,7 @@ function QueryCard({ q }: { q: AgentQuery }) {
         {q.hashscan && (
           <>
             {' · '}
-            <a href={q.hashscan} target="_blank" rel="noreferrer">
+            <a href={q.hashscan} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
               HashScan
             </a>
           </>

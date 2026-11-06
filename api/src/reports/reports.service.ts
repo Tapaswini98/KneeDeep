@@ -1,6 +1,8 @@
 import {
+  BadGatewayException,
   ConflictException,
   ForbiddenException,
+  GoneException,
   HttpException,
   HttpStatus,
   Inject,
@@ -8,7 +10,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { arkivExplorerTx } from '../arkiv/client';
+import { arkivExplorerAddress, arkivExplorerEntity, arkivExplorerTx } from '../arkiv/client';
+import { ArkivService } from '../arkiv/arkiv.service';
 import { ArkivStore, LiveReport } from '../arkiv/arkiv.store';
 import { Level, Source, Vote } from '../arkiv/schemas';
 import { APP_CONFIG, AppConfig } from '../config/config';
@@ -20,6 +23,19 @@ import { ReportsRepository } from './reports.repository';
 /** Half the diagonal of a precision-7 geohash cell: a cell counts as "within r" if any of it might be. */
 export const CELL_HALF_DIAGONAL_M = 110;
 
+/** A vote must land before its report expires; refuse votes on reports with less than this left. */
+const MIN_VOTE_WINDOW_S = 60;
+
+/** Public reporter tag: a prefix of the pseudonym, enough to say "this one is yours". */
+export const reporterTag = (pseudonym: string) => pseudonym.slice(0, 12);
+
+/** Arkiv failures (RPC down, rate limit, rejected tx) surface as a readable 502, not a bare 500. */
+function arkivWriteError(err: unknown): never {
+  if (err instanceof HttpException) throw err;
+  const e = err as { shortMessage?: string; message?: string };
+  throw new BadGatewayException(`Could not write to Arkiv: ${(e.shortMessage ?? e.message ?? String(err)).split('\n')[0]}`);
+}
+
 @Injectable()
 export class ReportsService {
   private readonly log = new Logger(ReportsService.name);
@@ -27,6 +43,7 @@ export class ReportsService {
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly store: ArkivStore,
+    private readonly arkiv: ArkivService,
     private readonly repo: ReportsRepository,
   ) {}
 
@@ -89,7 +106,7 @@ export class ReportsService {
       };
     } catch (err) {
       await this.repo.failReport(slot.id);
-      throw err;
+      arkivWriteError(err);
     }
   }
 
@@ -99,6 +116,13 @@ export class ReportsService {
 
     const voter = who.pseudonym;
     if (voter === report.reporter) throw new ForbiddenException('You cannot vote on your own report');
+
+    // A vote expires with its report; one written as the report expires would be rejected by Arkiv.
+    const { currentBlock, blockSeconds } = await this.arkiv.blockTiming();
+    const secondsLeft = Number(report.expiresAtBlock - currentBlock) * blockSeconds;
+    if (secondsLeft < MIN_VOTE_WINDOW_S) {
+      throw new GoneException('This report is about to expire, so it can no longer be voted on');
+    }
 
     const distance = distanceMeters({ lat: input.lat, lng: input.lng }, cellCenter(report.cell));
     if (distance > this.config.VOTE_MAX_DISTANCE_M) {
@@ -136,22 +160,28 @@ export class ReportsService {
       };
     } catch (err) {
       await this.repo.failVote(slot);
-      throw err;
+      arkivWriteError(err);
     }
   }
 
   /** Free: raw live reports near a point, for the map and for voters. Fusion is what agents pay for. */
   async live(lat: number, lng: number, radiusM: number) {
-    const { reports, votes, block } = await this.store.findInArea(prefixesCovering(lat, lng, radiusM));
+    const [{ reports, votes, block }, timing] = await Promise.all([
+      this.store.findInArea(prefixesCovering(lat, lng, radiusM)),
+      this.arkiv.blockTiming(),
+    ]);
     const now = Date.now() / 1000;
     const near = reports.filter(
       (r) =>
         now - r.reportedAt <= DEFAULT_MAX_AGE_MIN * 60 &&
         distanceMeters({ lat, lng }, cellCenter(r.cell)) <= radiusM + CELL_HALF_DIAGONAL_M,
     );
+    const txs = await this.repo.arkivTxFor(near.map((r) => r.key));
     return {
       generatedAt: new Date().toISOString(),
       arkivBlock: block.toString(),
+      writer: this.store.writer ?? null,
+      writerExplorer: this.store.writer ? arkivExplorerAddress(this.store.writer) : null,
       reports: near
         .sort((a, b) => b.reportedAt - a.reportedAt)
         .map((r: LiveReport) => {
@@ -166,6 +196,13 @@ export class ReportsService {
             ageMin: Math.round((now - r.reportedAt) / 6) / 10,
             confirmations: rv.filter((v) => v.vote === 'confirm').length,
             disputes: rv.filter((v) => v.vote === 'dispute').length,
+            reporter: reporterTag(r.reporter),
+            voters: rv.map((v) => ({ voter: reporterTag(v.voter), vote: v.vote })),
+            expiresInMin: Math.max(0, Math.round((Number(r.expiresAtBlock - timing.currentBlock) * timing.blockSeconds) / 6) / 10),
+            explorer: {
+              entity: arkivExplorerEntity(r.key),
+              tx: txs.get(r.key) ? arkivExplorerTx(txs.get(r.key)!) : null,
+            },
           };
         }),
     };

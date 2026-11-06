@@ -421,3 +421,93 @@ button.chip {
   background: var(--surface);
   cursor: pointer;
 }
+
+.popup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.popup-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.popup-title .muted {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.popup-actions,
+.popup-levels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.popup-actions button,
+.popup-levels button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid #c9d3dc;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.popup-levels button {
+  border-width: 2px;
+}
+
+.popup .notice,
+.panel .notice {
+  padding: 6px 8px;
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.toggles label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.query {
+  cursor: pointer;
+}
+
+.query:hover {
+  background: var(--bg);
+}
+
+button.chip.selected {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.nearby-text small.err {
+  color: var(--error);
+}
+
+.nearby-text small.ok {
+  color: var(--ok);
+}
+
+.leaflet-container {
+  cursor: crosshair;
+}

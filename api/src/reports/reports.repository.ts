@@ -74,4 +74,14 @@ export class ReportsRepository {
   async failVote(id: string): Promise<void> {
     await this.db.query(`UPDATE vote_index SET status = 'failed' WHERE id = $1`, [id]);
   }
+
+  /** Arkiv transaction hashes for reports we wrote (seeded or older entities may have none). */
+  async arkivTxFor(keys: string[]): Promise<Map<string, string>> {
+    if (keys.length === 0) return new Map();
+    const rows = await this.db.query<{ entity_key: string; arkiv_tx: string }>(
+      'SELECT entity_key, arkiv_tx FROM report_index WHERE entity_key = ANY($1) AND arkiv_tx IS NOT NULL',
+      [keys],
+    );
+    return new Map(rows.map((r) => [r.entity_key, r.arkiv_tx]));
+  }
 }
