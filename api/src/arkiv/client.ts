@@ -28,6 +28,16 @@ export function arkivWalletClient(accessKey: string, privateKey: string) {
 export type ArkivPublicClient = ReturnType<typeof arkivPublicClient>;
 export type ArkivWalletClient = ReturnType<typeof arkivWalletClient>;
 
+export const ARKIV_EXPLORER = 'https://rabdi.explorer.arkiv.network';
+
 export function arkivExplorerTx(txHash: string): string {
-  return `https://rabdi.explorer.arkiv.network/tx/${txHash}`;
+  return `${ARKIV_EXPLORER}/tx/${txHash}`;
+}
+
+export function arkivExplorerEntity(entityKey: string): string {
+  return `${ARKIV_EXPLORER}/entity/${entityKey}`;
+}
+
+export function arkivExplorerAddress(address: string): string {
+  return `${ARKIV_EXPLORER}/address/${address}`;
 }

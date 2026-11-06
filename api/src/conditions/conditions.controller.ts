@@ -37,6 +37,14 @@ export class ConditionsController {
       amountTinybars: BigInt(this.payments.quote!.amount),
       dataStatus: result.dataStatus,
       used: result.used,
+      summary: result.body.areas.map((a) => ({
+        cell: a.cell,
+        level: a.level,
+        confidence: a.confidence,
+        confidenceLabel: a.confidenceLabel,
+        explanation: a.explanation,
+        source: a.source,
+      })),
     });
     res.setHeader(QUERY_ID_HEADER, queryId);
     return { queryId, ...result.body };

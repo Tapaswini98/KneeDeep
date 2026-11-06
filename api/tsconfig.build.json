@@ -1,6 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "rootDir": "./src" },
+  "compilerOptions": {
+    "rootDir": "./src",
+    // Nest deletes dist/ before each build; an incremental cache kept outside dist/ would make
+    // tsc think nothing changed and emit no files ("Cannot find module dist/main").
+    "incremental": false
+  },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "scripts", "**/*.spec.ts"]
 }

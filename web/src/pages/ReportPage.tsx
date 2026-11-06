@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { VerifyHuman } from '../components/VerifyHuman';
 import { api, ApiError, LiveReport } from '../lib/api';
 import { loadSession, ReporterSession, saveSession } from '../lib/identity';
-import { Level, LEVELS } from '../lib/levels';
+import { DEMO_SPOTS, Level, LEVELS } from '../lib/levels';
 
-type Position = { lat: number; lng: number; accuracy: number };
+type Position = { lat: number; lng: number; accuracy: number; label?: string };
 type Status = { kind: 'ok' | 'error'; text: string } | null;
 
 const levelInfo = (id: string) => LEVELS.find((l) => l.id === id);
@@ -147,9 +147,22 @@ export function ReportPage() {
       <button className="secondary" onClick={locate} disabled={locating}>
         {locating ? 'Locating…' : position ? 'Update location' : 'Share my location'}
       </button>
+      {session?.method === 'dev' && (
+        <div className="demo-spots">
+          <span className="muted small">Dev mode: report from a demo spot</span>
+          {DEMO_SPOTS.map((s) => (
+            <button key={s.name} className="chip" onClick={() => setPosition({ lat: s.lat, lng: s.lng, accuracy: 0, label: s.name })}>
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
       {position && (
         <p className="muted">
-          Location captured (±{Math.round(position.accuracy)} m). Only a ~150 m area is stored, never your exact position.
+          {position.label
+            ? `Location: ${position.label} (demo spot).`
+            : `Location captured (±${Math.round(position.accuracy)} m).`}{' '}
+          Only a ~150 m area is stored, never your exact position.
         </p>
       )}
 

@@ -31,4 +31,10 @@ export class ArkivService {
   async blockNumber(): Promise<bigint> {
     return this.reader.getBlockNumber();
   }
+
+  /** Current block and seconds per block: turns an entity's expiry block into a time. */
+  async blockTiming(): Promise<{ currentBlock: bigint; blockSeconds: number }> {
+    const t = await this.reader.getBlockTiming();
+    return { currentBlock: t.currentBlock, blockSeconds: t.blockDuration };
+  }
 }

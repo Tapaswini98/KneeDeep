@@ -20,6 +20,8 @@ async function post(path: string, body: unknown, token?: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(body),
+  }).catch(() => {
+    throw new Error(`Cannot reach the KneeDeep API at ${API}. Start it in another terminal: npm run dev`);
   });
   const json = (await res.json()) as Record<string, unknown>;
   if (!res.ok) throw new Error(`${path} -> ${res.status}: ${JSON.stringify(json.message ?? json)}`);

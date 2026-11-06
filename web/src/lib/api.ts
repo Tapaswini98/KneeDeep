@@ -53,3 +53,38 @@ export interface LiveReport {
   confirmations: number;
   disputes: number;
 }
+
+export interface AreaSummary {
+  cell: string;
+  level: string | null;
+  confidence: number;
+  confidenceLabel: 'high' | 'medium' | 'low';
+  explanation: string;
+  source: 'live' | 'simulated' | 'mixed';
+}
+
+export interface AgentQuery {
+  id: string;
+  createdAt: string;
+  lat: number;
+  lng: number;
+  radiusM: number;
+  dataStatus: 'live' | 'simulated' | 'mixed' | 'empty' | 'stub';
+  amountTinybars: string;
+  paid: boolean;
+  paymentTxId: string | null;
+  payer: string | null;
+  hashscan: string | null;
+  reportsUsed: number;
+  corroboratedUsed: number;
+  summary: AreaSummary[];
+}
+
+export interface Activity {
+  generatedAt: string;
+  price: { network: string; amount: string; payTo: string } | null;
+  totals: { paidQueries: number; revenueTinybars: string };
+  queries: AgentQuery[];
+}
+
+export const formatHbar = (tinybars: string | number) => `${(Number(tinybars) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })} HBAR`;

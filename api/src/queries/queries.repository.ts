@@ -12,6 +12,34 @@ export interface NewQuery {
   dataStatus: DataStatus;
   /** Reports the answer was built from; the basis for reporter earnings once the query is paid. */
   used: { key: string; reporter: string; corroborated: boolean }[];
+  /** Per-area answer, as returned to the agent (level, confidence, explanation). */
+  summary: AreaSummary[];
+}
+
+export interface AreaSummary {
+  cell: string;
+  level: string | null;
+  confidence: number;
+  confidenceLabel: string;
+  explanation: string;
+  source: string;
+}
+
+export interface RecentQuery {
+  id: string;
+  createdAt: string;
+  lat: number;
+  lng: number;
+  radiusM: number;
+  dataStatus: DataStatus;
+  amountTinybars: string;
+  paid: boolean;
+  paymentTxId: string | null;
+  payer: string | null;
+  network: string | null;
+  reportsUsed: number;
+  corroboratedUsed: number;
+  summary: AreaSummary[];
 }
 
 export interface Settlement {
@@ -28,9 +56,9 @@ export class QueriesRepository {
   async create(q: NewQuery): Promise<string> {
     return this.db.tx(async (c) => {
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO queries (lat, lng, radius_m, cells, amount_tinybars, data_status)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [q.lat, q.lng, q.radiusM, q.cells, q.amountTinybars.toString(), q.dataStatus],
+        `INSERT INTO queries (lat, lng, radius_m, cells, amount_tinybars, data_status, summary)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [q.lat, q.lng, q.radiusM, q.cells, q.amountTinybars.toString(), q.dataStatus, JSON.stringify(q.summary)],
       );
       const id = rows[0].id;
       if (q.used.length > 0) {
@@ -61,5 +89,28 @@ export class QueriesRepository {
       [queryId, s.txId, s.payer ?? null, s.network],
     );
     return rows.length === 1;
+  }
+
+  /** Latest queries with their payment and what the answer rested on, for the dashboard. */
+  async recent(limit: number): Promise<RecentQuery[]> {
+    return this.db.query<RecentQuery>(
+      `SELECT q.id, q.created_at AS "createdAt", q.lat, q.lng, q.radius_m AS "radiusM",
+              q.data_status AS "dataStatus", q.amount_tinybars::text AS "amountTinybars",
+              q.paid_at IS NOT NULL AS paid, q.payment_tx_id AS "paymentTxId",
+              q.payer_account AS payer, q.network, q.summary,
+              COUNT(qr.report_key)::int AS "reportsUsed",
+              COUNT(qr.report_key) FILTER (WHERE qr.corroborated)::int AS "corroboratedUsed"
+       FROM queries q LEFT JOIN query_reports qr ON qr.query_id = q.id
+       GROUP BY q.id ORDER BY q.created_at DESC LIMIT $1`,
+      [limit],
+    );
+  }
+
+  async totals(): Promise<{ paidQueries: number; revenueTinybars: string }> {
+    const [row] = await this.db.query<{ paidQueries: number; revenueTinybars: string }>(
+      `SELECT COUNT(*)::int AS "paidQueries", COALESCE(SUM(amount_tinybars), 0)::text AS "revenueTinybars"
+       FROM queries WHERE paid_at IS NOT NULL`,
+    );
+    return row;
   }
 }

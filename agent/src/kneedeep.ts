@@ -89,7 +89,9 @@ export class KneeDeepClient {
 
   /** Free. Tells the agent what is for sale and the expected price before it pays. */
   async discover(): Promise<Catalog['endpoints'][number]> {
-    const res = await fetch(`${this.baseUrl}/v1`, { signal: AbortSignal.timeout(10_000) });
+    const res = await fetch(`${this.baseUrl}/v1`, { signal: AbortSignal.timeout(10_000) }).catch(() => {
+      throw new Error(`Cannot reach the KneeDeep API at ${this.baseUrl}. Start it in another terminal: npm run dev`);
+    });
     if (!res.ok) throw new Error(`Catalog ${res.status}`);
     const catalog = (await res.json()) as Catalog;
     const endpoint = catalog.endpoints.find((e) => e.id === 'conditions');
