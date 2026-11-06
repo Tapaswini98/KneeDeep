@@ -13,9 +13,17 @@ export function parsePrivateKey(raw: string, type: KeyType): PrivateKey {
   return type === 'ECDSA' ? PrivateKey.fromStringECDSA(hex) : PrivateKey.fromStringED25519(hex);
 }
 
+/** "0.0.123@1700000000.000000042" -> "0.0.123-1700000000-000000042" (mirror node / HashScan form). */
+export function toDashedTxId(txId: string): string {
+  const [account, ts] = txId.split('@');
+  if (!ts) return txId;
+  const [secs, nanos] = ts.split('.');
+  return `${account}-${secs}-${nanos ?? '0'}`;
+}
+
 export function hashscanTxUrl(network: string, txId: string): string {
   const net = network.replace('hedera:', '');
-  return `https://hashscan.io/${net}/transaction/${encodeURIComponent(txId)}`;
+  return `https://hashscan.io/${net}/transaction/${toDashedTxId(txId)}`;
 }
 
 export function hashscanAccountUrl(network: string, accountId: string): string {

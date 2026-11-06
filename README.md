@@ -22,6 +22,27 @@ Built at ETHGlobal Mumbai 2026 for **Hedera** (AI Agents That Pay: x402), **Arki
    Hedera, and receives a level per area with a confidence score and the reasons behind it.
 4. **Earn.** Reporters whose corroborated reports were used in paid answers are paid in one batched Hedera transfer.
 
+## Payment flow (x402 on Hedera)
+
+```
+agent                         KneeDeep API                       facilitator (Blocky402)      Hedera
+  | GET /v1  (free catalog)       |                                    |                        |
+  |------------------------------>|                                    |                        |
+  | GET /v1/conditions            |                                    |                        |
+  |------------------------------>| 402 + PAYMENT-REQUIRED             |                        |
+  |<------------------------------| (0.1 HBAR to platform account)     |                        |
+  | sign HBAR transfer (own key)  |                                    |                        |
+  | GET + PAYMENT-SIGNATURE ----->| verify ------------------------->  |                        |
+  |                               | build answer, record query         |                        |
+  |                               | settle ------------------------->  | submit, pay fee ---->  |
+  | 200 + answer + PAYMENT-RESPONSE (tx id)  <-- mark query paid       |                        |
+```
+
+- The agent pays from its own Hedera account. No human approves a payment; a per-query cap
+  (`AGENT_MAX_TINYBARS_PER_QUERY`) bounds what it will sign.
+- If the API answers 4xx/5xx, settlement is cancelled: invalid queries are never charged.
+- Every paid query is stored with its settled Hedera transaction id (`queries.payment_tx_id`).
+
 ## Repository layout
 
 | Folder | What |
