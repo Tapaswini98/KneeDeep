@@ -328,15 +328,22 @@ async function main() {
       const { answer, payment } = await agent.conditions(ANDHERI.lat, ANDHERI.lng, 300);
       const area = answer.areas.find((a) => a.cell === toCell(ANDHERI.lat, ANDHERI.lng));
       assert(payment, 'no settled payment in PAYMENT-RESPONSE');
-      assert(area?.level === 'knee', `expected knee at Andheri subway, got ${area?.level ?? 'nothing'}`);
-      assert(area.confidenceLabel === 'high', `expected high confidence, got ${area.confidenceLabel}`);
-      assert(
-        answer.dataStatus === 'simulated',
-        `seeded data must be labelled simulated, got ${answer.dataStatus}`,
-      );
+      // Record the payment first: the checks after this one inspect it even if an assertion below fails.
       paidTx = payment.txId;
       paidQueryId = answer.queryId;
-      return `knee, ${area.confidence} high: "${area.explanation}"`;
+      assert(area?.level === 'knee', `expected knee at Andheri subway, got ${area?.level ?? 'nothing'}`);
+      assert(area.confidenceLabel === 'high', `expected high confidence, got ${area.confidenceLabel}`);
+      // Real World ID reports may share the area with the seeded ones ("mixed"); either way the
+      // simulated part must be declared, never passed off as live.
+      assert(
+        answer.dataStatus === 'simulated' || answer.dataStatus === 'mixed',
+        `seeded data must be labelled simulated, got ${answer.dataStatus}`,
+      );
+      assert(
+        answer.notices.some((n) => n.includes('SIMULATED')),
+        'answer includes simulated data but no SIMULATED notice',
+      );
+      return `knee, ${area.confidence} high, data ${answer.dataStatus}: "${area.explanation}"`;
     });
     await check('Simulated reports never earn (reporter payouts)', async () => {
       assert(paidQueryId, 'no paid query to inspect');
