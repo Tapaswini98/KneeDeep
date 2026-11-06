@@ -68,7 +68,10 @@ export class ReportsRepository {
   }
 
   async completeVote(id: string, entityKey: string): Promise<void> {
-    await this.db.query(`UPDATE vote_index SET entity_key = $2, status = 'written' WHERE id = $1`, [id, entityKey]);
+    await this.db.query(`UPDATE vote_index SET entity_key = $2, status = 'written' WHERE id = $1`, [
+      id,
+      entityKey,
+    ]);
   }
 
   async failVote(id: string): Promise<void> {

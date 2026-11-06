@@ -4,7 +4,7 @@
  *   npm run hedera:balance
  */
 import { readConfig } from '../src/config/config';
-import { hashscanAccountUrl, KeyType, parsePrivateKey } from '../src/hedera/keys';
+import { hashscanAccountUrl, type KeyType, parsePrivateKey } from '../src/hedera/keys';
 import { fetchAccount, formatHbar } from '../src/hedera/mirror';
 
 async function checkAccount(label: string, accountId: string, rawKey: string | undefined, keyType: KeyType) {
@@ -20,7 +20,9 @@ async function checkAccount(label: string, accountId: string, rawKey: string | u
   const ours = parsePrivateKey(rawKey, keyType).publicKey.toStringRaw().toLowerCase();
   const onchain = acct.key?.key?.toLowerCase();
   if (onchain && !onchain.endsWith(ours)) {
-    console.log(`  WARNING: private key does not match the account's public key. Check the key type (${keyType}).`);
+    console.log(
+      `  WARNING: private key does not match the account's public key. Check the key type (${keyType}).`,
+    );
     return false;
   }
   console.log('  Key matches the account.');
@@ -31,12 +33,19 @@ async function main() {
   const config = readConfig();
   if (!config.HEDERA_ACCOUNT_ID) throw new Error('Set HEDERA_ACCOUNT_ID in .env (https://portal.hedera.com)');
 
-  let ok = await checkAccount('Platform', config.HEDERA_ACCOUNT_ID, config.HEDERA_PRIVATE_KEY, config.HEDERA_KEY_TYPE);
+  let ok = await checkAccount(
+    'Platform',
+    config.HEDERA_ACCOUNT_ID,
+    config.HEDERA_PRIVATE_KEY,
+    config.HEDERA_KEY_TYPE,
+  );
 
   const agentId = process.env.AGENT_HEDERA_ACCOUNT_ID?.trim();
   if (agentId) {
     const agentType = (process.env.AGENT_HEDERA_KEY_TYPE?.trim() || 'ECDSA') as KeyType;
-    ok = (await checkAccount('Agent   ', agentId, process.env.AGENT_HEDERA_PRIVATE_KEY?.trim(), agentType)) && ok;
+    ok =
+      (await checkAccount('Agent   ', agentId, process.env.AGENT_HEDERA_PRIVATE_KEY?.trim(), agentType)) &&
+      ok;
   }
 
   const res = await fetch(`${config.FACILITATOR_URL}/supported`, { signal: AbortSignal.timeout(10_000) });

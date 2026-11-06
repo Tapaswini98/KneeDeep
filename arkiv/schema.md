@@ -8,27 +8,27 @@ Every entity is owned by the KneeDeep writer wallet. Queries filter on that owne
 
 ## `kneedeep.report.v1`: one street-level observation
 
-| Attribute    | Type | Indexed | Meaning |
-|--------------|------|---------|---------|
-| `level`      | str  | yes | `dry`, `ankle`, `knee`, `waist` or `closed` |
-| `cell`       | str  | yes | Geohash, precision 7 (about 150 m). No raw GPS is stored. |
-| `reportedAt` | u64  | yes | Unix seconds |
-| `reporter`   | str  | yes | `sha256(salt ‖ World ID nullifier)`. The nullifier is never stored. |
-| `source`     | str  | yes | `live` or `simulated`. Simulated (demo) data is never presented as live. |
+| Attribute    | Type | Indexed | Meaning                                                                  |
+| ------------ | ---- | ------- | ------------------------------------------------------------------------ |
+| `level`      | str  | yes     | `dry`, `ankle`, `knee`, `waist` or `closed`                              |
+| `cell`       | str  | yes     | Geohash, precision 7 (about 150 m). No raw GPS is stored.                |
+| `reportedAt` | u64  | yes     | Unix seconds                                                             |
+| `reporter`   | str  | yes     | `sha256(salt ‖ World ID nullifier)`. The nullifier is never stored.      |
+| `source`     | str  | yes     | `live` or `simulated`. Simulated (demo) data is never presented as live. |
 
 Expiry: 3 hours (`REPORT_TTL_SECONDS`). Street conditions have a half-life, so once a
 report expires it is gone from Arkiv.
 
 ## `kneedeep.vote.v1`: a confirmation or dispute of a report
 
-| Attribute | Type | Indexed | Meaning |
-|-----------|------|---------|---------|
-| `report`  | key  | yes | Entity key of the report being voted on |
-| `vote`    | str  | yes | `confirm` or `dispute` |
-| `cell`    | str  | yes | The report's cell, so one query fetches an area's votes |
-| `votedAt` | u64  | yes | Unix seconds |
-| `voter`   | str  | yes | Voter pseudonym (same scheme as `reporter`) |
-| `source`  | str  | yes | `live` or `simulated` |
+| Attribute | Type | Indexed | Meaning                                                 |
+| --------- | ---- | ------- | ------------------------------------------------------- |
+| `report`  | key  | yes     | Entity key of the report being voted on                 |
+| `vote`    | str  | yes     | `confirm` or `dispute`                                  |
+| `cell`    | str  | yes     | The report's cell, so one query fetches an area's votes |
+| `votedAt` | u64  | yes     | Unix seconds                                            |
+| `voter`   | str  | yes     | Voter pseudonym (same scheme as `reporter`)             |
+| `source`  | str  | yes     | `live` or `simulated`                                   |
 
 Expiry: no later than the report it refers to.
 

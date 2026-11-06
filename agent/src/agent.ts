@@ -24,7 +24,9 @@ async function main() {
 
   const endpoint = await client.discover();
   const p = endpoint.payment!;
-  console.log(`\nDiscovered ${endpoint.method} ${endpoint.path}: ${p.amount} tinybars to ${p.payTo} on ${p.network}`);
+  console.log(
+    `\nDiscovered ${endpoint.method} ${endpoint.path}: ${p.amount} tinybars to ${p.payTo} on ${p.network}`,
+  );
 
   const waypoint = ROUTES[0].waypoints[ROUTES[0].waypoints.length - 1];
   console.log(`Paying for conditions at ${waypoint.name}...`);
@@ -33,7 +35,9 @@ async function main() {
   console.log(`Answer in ${((Date.now() - started) / 1000).toFixed(1)}s, data: ${answer.dataStatus}`);
   for (const n of answer.notices ?? []) console.log(`  NOTE: ${n}`);
   for (const a of answer.areas) {
-    console.log(`  ${a.cell} (${a.distanceM} m): ${a.level ?? 'CONTESTED'}, confidence ${a.confidence} [${a.confidenceLabel}]`);
+    console.log(
+      `  ${a.cell} (${a.distanceM} m): ${a.level ?? 'CONTESTED'}, confidence ${a.confidence} [${a.confidenceLabel}]`,
+    );
     console.log(`    ${a.explanation}`);
   }
 

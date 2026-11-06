@@ -58,7 +58,15 @@ export class QueriesRepository {
       const { rows } = await c.query<{ id: string }>(
         `INSERT INTO queries (lat, lng, radius_m, cells, amount_tinybars, data_status, summary)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [q.lat, q.lng, q.radiusM, q.cells, q.amountTinybars.toString(), q.dataStatus, JSON.stringify(q.summary)],
+        [
+          q.lat,
+          q.lng,
+          q.radiusM,
+          q.cells,
+          q.amountTinybars.toString(),
+          q.dataStatus,
+          JSON.stringify(q.summary),
+        ],
       );
       const id = rows[0].id;
       if (q.used.length > 0) {

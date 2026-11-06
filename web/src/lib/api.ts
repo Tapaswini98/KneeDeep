@@ -10,6 +10,13 @@ export class ApiError extends Error {
   }
 }
 
+let onUnauthorized: (() => void) | null = null;
+
+/** Called whenever an authenticated request gets 401: the reporter session is no longer valid. */
+export function setUnauthorizedHandler(fn: (() => void) | null): void {
+  onUnauthorized = fn;
+}
+
 export async function api<T>(path: string, init?: RequestInit & { token?: string }): Promise<T> {
   const { token, ...rest } = init ?? {};
   const res = await fetch(`${BASE}${path}`, {
@@ -27,6 +34,7 @@ export async function api<T>(path: string, init?: RequestInit & { token?: string
   } catch {
     body = undefined;
   }
+  if (res.status === 401 && token) onUnauthorized?.();
   if (!res.ok) {
     const message =
       (body as { message?: string | string[] } | undefined)?.message ?? `${res.status} ${res.statusText}`;
@@ -100,4 +108,5 @@ export interface Activity {
   queries: AgentQuery[];
 }
 
-export const formatHbar = (tinybars: string | number) => `${(Number(tinybars) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })} HBAR`;
+export const formatHbar = (tinybars: string | number) =>
+  `${(Number(tinybars) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })} HBAR`;

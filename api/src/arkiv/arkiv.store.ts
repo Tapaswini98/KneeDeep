@@ -39,7 +39,8 @@ export class ArkivStore {
 
   private owner(): `0x${string}` {
     const owner = this.arkiv.writerAddress;
-    if (!owner) throw new ServiceUnavailableException('Arkiv is not configured: ARKIV_PRIVATE_KEY is not set');
+    if (!owner)
+      throw new ServiceUnavailableException('Arkiv is not configured: ARKIV_PRIVATE_KEY is not set');
     return owner;
   }
 
@@ -60,7 +61,13 @@ export class ArkivStore {
     return this.serialised(async () => {
       const res = await this.arkiv.wallet.createEntity(
         Reports,
-        { level: r.level, cell: r.cell, reportedAt: u64(r.reportedAt), reporter: r.reporter, source: r.source },
+        {
+          level: r.level,
+          cell: r.cell,
+          reportedAt: u64(r.reportedAt),
+          reporter: r.reporter,
+          source: r.source,
+        },
         { expiration: ExpirationTime.fromSeconds(r.ttlSeconds) },
       );
       return { entityKey: res.entityKey, txHash: res.txHash, expiresAtBlock: BigInt(res.expiresAt) };
@@ -115,7 +122,9 @@ export class ArkivStore {
   }
 
   /** Live reports and votes whose cell starts with any of the prefixes. */
-  async findInArea(prefixes: string[]): Promise<{ reports: LiveReport[]; votes: VoteInput[]; block: bigint }> {
+  async findInArea(
+    prefixes: string[],
+  ): Promise<{ reports: LiveReport[]; votes: VoteInput[]; block: bigint }> {
     const owner = this.owner();
     const inArea = or(prefixes.map((p) => startsWith('cell', p)));
 
@@ -124,7 +133,15 @@ export class ArkivStore {
     let after: string | undefined;
     for (let page = 0; page < MAX_PAGES; page++) {
       const res = await this.arkiv.reader
-        .select({ $key: true, $expiresAt: true, level: true, cell: true, reportedAt: true, reporter: true, source: true })
+        .select({
+          $key: true,
+          $expiresAt: true,
+          level: true,
+          cell: true,
+          reportedAt: true,
+          reporter: true,
+          source: true,
+        })
         .from(Reports)
         .where(after ? and(inArea, gt('$key', keyValue(after as `0x${string}`))) : inArea)
         .ownedBy(owner)

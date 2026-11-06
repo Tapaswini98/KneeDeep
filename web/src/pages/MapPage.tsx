@@ -1,9 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Circle, CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import {
+  Circle,
+  CircleMarker,
+  MapContainer,
+  Popup,
+  TileLayer,
+  Tooltip,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
 import { VerifyHuman } from '../components/VerifyHuman';
 import { castVote, errorText, submitReport, voteBlocker, voterPosition } from '../lib/actions';
-import { Activity, AgentQuery, api, formatHbar, LiveReport, LiveReports } from '../lib/api';
-import { Level, LEVELS, MUMBAI_CENTER } from '../lib/levels';
+import {
+  type Activity,
+  type AgentQuery,
+  api,
+  formatHbar,
+  type LiveReport,
+  type LiveReports,
+} from '../lib/api';
+import { type Level, LEVELS, MUMBAI_CENTER } from '../lib/levels';
 import { useSession } from '../lib/session';
 import { usePolling } from '../lib/usePolling';
 
@@ -169,7 +185,9 @@ export function MapPage() {
             )}
             {reports.updatedAt && ` · ${reports.updatedAt.toLocaleTimeString()}`}
           </p>
-          {(reports.error || activity.error) && <p className="notice error small">{reports.error ?? activity.error}</p>}
+          {(reports.error || activity.error) && (
+            <p className="notice error small">{reports.error ?? activity.error}</p>
+          )}
         </section>
 
         <section>
@@ -183,7 +201,11 @@ export function MapPage() {
               ] as const
             ).map(([k, label]) => (
               <label key={k}>
-                <input type="checkbox" checked={layers[k]} onChange={(e) => setLayers({ ...layers, [k]: e.target.checked })} />
+                <input
+                  type="checkbox"
+                  checked={layers[k]}
+                  onChange={(e) => setLayers({ ...layers, [k]: e.target.checked })}
+                />
                 {label}
               </label>
             ))}
@@ -238,7 +260,11 @@ function ReportPopup({ report: r, onDone }: { report: LiveReport; onDone: (n: No
     try {
       const at = await voterPosition(session, r);
       const res = await castVote(session, r.key, v, at);
-      const n = { kind: 'ok' as const, text: v === 'confirm' ? 'Confirmed.' : 'Disputed.', link: res.explorer };
+      const n = {
+        kind: 'ok' as const,
+        text: v === 'confirm' ? 'Confirmed.' : 'Disputed.',
+        link: res.explorer,
+      };
       setMsg(n);
       onDone(n);
     } catch (err) {
@@ -337,7 +363,13 @@ function QueryCard({ q, onSelect }: { q: AgentQuery; onSelect: () => void }) {
   const worst = q.summary[0];
   const info = levelInfo(worst?.level ?? null);
   return (
-    <div className="query" role="button" tabIndex={0} onClick={onSelect} onKeyDown={(e) => e.key === 'Enter' && onSelect()}>
+    <div
+      className="query"
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => e.key === 'Enter' && onSelect()}
+    >
       <div className="query-head">
         <span>{timeAgo(q.createdAt)}</span>
         {q.paid ? (
@@ -358,7 +390,9 @@ function QueryCard({ q, onSelect }: { q: AgentQuery; onSelect: () => void }) {
           <p className="small">{worst.explanation}</p>
         </>
       ) : (
-        <p className="small muted">No fresh reports in range{q.dataStatus === 'stub' ? ' (stub answer)' : ''}.</p>
+        <p className="small muted">
+          No fresh reports in range{q.dataStatus === 'stub' ? ' (stub answer)' : ''}.
+        </p>
       )}
       <p className="small muted">
         {q.reportsUsed} report(s) used, {q.corroboratedUsed} corroborated · data: {q.dataStatus}

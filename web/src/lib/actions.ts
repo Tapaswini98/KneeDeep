@@ -1,4 +1,4 @@
-import { api, ApiError, LiveReport } from './api';
+import { api, ApiError, type LiveReport } from './api';
 import type { ReporterSession } from './identity';
 import type { Level } from './levels';
 
@@ -10,7 +10,11 @@ export interface ReportCreated {
 }
 
 export function submitReport(session: ReporterSession, report: { level: Level; lat: number; lng: number }) {
-  return api<ReportCreated>('/v1/reports', { method: 'POST', token: session.token, body: JSON.stringify(report) });
+  return api<ReportCreated>('/v1/reports', {
+    method: 'POST',
+    token: session.token,
+    body: JSON.stringify(report),
+  });
 }
 
 export function castVote(

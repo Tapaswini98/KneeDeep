@@ -16,17 +16,23 @@ import { readConfig } from '../src/config/config';
 
 async function main() {
   const config = readConfig();
-  const writer = (process.argv[2]?.startsWith('0x')
-    ? process.argv[2]
-    : config.ARKIV_PRIVATE_KEY
-      ? viemAccounts.privateKeyToAccount(config.ARKIV_PRIVATE_KEY as `0x${string}`).address
-      : undefined) as `0x${string}` | undefined;
+  const writer = (
+    process.argv[2]?.startsWith('0x')
+      ? process.argv[2]
+      : config.ARKIV_PRIVATE_KEY
+        ? viemAccounts.privateKeyToAccount(config.ARKIV_PRIVATE_KEY as `0x${string}`).address
+        : undefined
+  ) as `0x${string}` | undefined;
   if (!writer) throw new Error('Pass the writer address: npm run arkiv:query -- 0x...');
   const prefix = process.argv[3] ?? 'te7'; // te7 covers Mumbai
 
-  const client = createPublicClient({ chain: rabdi({ accessKey: config.ARKIV_ACCESS_KEY }), transport: viem.http() });
+  const client = createPublicClient({
+    chain: rabdi({ accessKey: config.ARKIV_ACCESS_KEY }),
+    transport: viem.http(),
+  });
   const { currentBlock, blockDuration } = await client.getBlockTiming();
-  const minutesLeft = (expiresAt: bigint) => Math.round((Number(expiresAt - currentBlock) * blockDuration) / 60);
+  const minutesLeft = (expiresAt: bigint) =>
+    Math.round((Number(expiresAt - currentBlock) * blockDuration) / 60);
 
   console.log(`Writer ${writer}`);
   console.log(`  ${arkivExplorerAddress(writer)}`);
@@ -60,7 +66,9 @@ async function main() {
     .fetch();
   console.log(`\n${votes.entities.length} live vote(s):`);
   for (const v of votes.entities) {
-    console.log(`  ${v.vote.value.padEnd(7)} on ${v.report.value.slice(0, 12)}…  ${v.cell.value}  ${arkivExplorerEntity(v.$key)}`);
+    console.log(
+      `  ${v.vote.value.padEnd(7)} on ${v.report.value.slice(0, 12)}…  ${v.cell.value}  ${arkivExplorerEntity(v.$key)}`,
+    );
   }
 }
 

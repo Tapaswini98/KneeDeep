@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { VerifyHuman } from '../components/VerifyHuman';
 import { castVote, currentPosition, errorText, submitReport, voteBlocker } from '../lib/actions';
-import { api, ApiError, LiveReport, LiveReports } from '../lib/api';
-import { DEMO_SPOTS, Level, LEVELS } from '../lib/levels';
+import { api, type LiveReport, type LiveReports } from '../lib/api';
+import { DEMO_SPOTS, type Level, LEVELS } from '../lib/levels';
 import { useSession } from '../lib/session';
 
 type Position = { lat: number; lng: number; accuracy: number; label?: string };
@@ -23,11 +23,7 @@ export function ReportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [nearby, setNearby] = useState<LiveReport[]>([]);
 
-  /** A 401 means the session is gone or expired: ask the person to verify again. */
-  const fail = (err: unknown): Status => {
-    if (err instanceof ApiError && err.status === 401) signOut();
-    return { kind: 'error', text: errorText(err) };
-  };
+  const fail = (err: unknown): Status => ({ kind: 'error', text: errorText(err) });
 
   const loadNearby = useCallback(async (p: Position) => {
     try {
@@ -60,7 +56,11 @@ export function ReportPage() {
     try {
       const r = await submitReport(session, { level, lat: position.lat, lng: position.lng });
       const until = new Date(r.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setStatus({ kind: 'ok', text: `Report saved on Arkiv. It stays live until ${until}, then disappears.`, link: r.explorer });
+      setStatus({
+        kind: 'ok',
+        text: `Report saved on Arkiv. It stays live until ${until}, then disappears.`,
+        link: r.explorer,
+      });
       setLevel(null);
       await loadNearby(position);
     } catch (err) {
@@ -80,7 +80,7 @@ export function ReportPage() {
         <p className="muted session">
           {session.method === 'world' ? 'Verified human' : 'Dev identity (simulated)'} · reporter{' '}
           <code>{session.reporter}</code>{' '}
-          <button className="link" onClick={signOut}>
+          <button className="link" onClick={() => signOut()}>
             sign out
           </button>
         </p>
@@ -149,13 +149,7 @@ export function ReportPage() {
           <h3>Live reports within 1 km</h3>
           {nearby.length === 0 && <p className="muted">None right now.</p>}
           {nearby.map((r) => (
-            <NearbyItem
-              key={r.key}
-              report={r}
-              position={position}
-              onVoted={() => loadNearby(position)}
-              onUnauthorized={signOut}
-            />
+            <NearbyItem key={r.key} report={r} position={position} onVoted={() => loadNearby(position)} />
           ))}
         </section>
       )}
@@ -167,12 +161,10 @@ function NearbyItem({
   report: r,
   position,
   onVoted,
-  onUnauthorized,
 }: {
   report: LiveReport;
   position: Position;
   onVoted: () => void;
-  onUnauthorized: () => void;
 }) {
   const { session } = useSession();
   const [busy, setBusy] = useState(false);
@@ -188,7 +180,6 @@ function NearbyItem({
       setMsg({ kind: 'ok', text: v === 'confirm' ? 'Confirmed.' : 'Disputed.', link: res.explorer });
       onVoted();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) onUnauthorized();
       setMsg({ kind: 'error', text: errorText(err) });
     } finally {
       setBusy(false);
@@ -201,7 +192,8 @@ function NearbyItem({
       <div className="nearby-text">
         <strong>{levelInfo(r.level)?.label ?? r.level}</strong>
         <small>
-          {Math.round(r.ageMin)} min ago · +{r.confirmations} / −{r.disputes} · expires in {Math.round(r.expiresInMin)} min
+          {Math.round(r.ageMin)} min ago · +{r.confirmations} / −{r.disputes} · expires in{' '}
+          {Math.round(r.expiresInMin)} min
           {r.source === 'simulated' && ' · SIMULATED'}
         </small>
         {msg && (

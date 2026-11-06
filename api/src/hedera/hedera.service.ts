@@ -18,7 +18,8 @@ export class HederaService implements OnModuleDestroy {
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {
     this.network = config.HEDERA_NETWORK;
     this.accountId = config.HEDERA_ACCOUNT_ID;
-    if (config.HEDERA_PRIVATE_KEY) this.key = parsePrivateKey(config.HEDERA_PRIVATE_KEY, config.HEDERA_KEY_TYPE);
+    if (config.HEDERA_PRIVATE_KEY)
+      this.key = parsePrivateKey(config.HEDERA_PRIVATE_KEY, config.HEDERA_KEY_TYPE);
   }
 
   get configured(): boolean {
@@ -28,7 +29,9 @@ export class HederaService implements OnModuleDestroy {
   /** SDK client with the platform account as operator, created on first use. */
   get sdk(): Client {
     if (!this.accountId || !this.key) {
-      throw new ServiceUnavailableException('Hedera not configured: set HEDERA_ACCOUNT_ID and HEDERA_PRIVATE_KEY');
+      throw new ServiceUnavailableException(
+        'Hedera not configured: set HEDERA_ACCOUNT_ID and HEDERA_PRIVATE_KEY',
+      );
     }
     if (!this.client) {
       const base = this.network === 'hedera:mainnet' ? Client.forMainnet() : Client.forTestnet();

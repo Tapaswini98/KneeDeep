@@ -33,7 +33,9 @@ export const reporterTag = (pseudonym: string) => pseudonym.slice(0, 12);
 function arkivWriteError(err: unknown): never {
   if (err instanceof HttpException) throw err;
   const e = err as { shortMessage?: string; message?: string };
-  throw new BadGatewayException(`Could not write to Arkiv: ${(e.shortMessage ?? e.message ?? String(err)).split('\n')[0]}`);
+  throw new BadGatewayException(
+    `Could not write to Arkiv: ${(e.shortMessage ?? e.message ?? String(err)).split('\n')[0]}`,
+  );
 }
 
 @Injectable()
@@ -198,7 +200,10 @@ export class ReportsService {
             disputes: rv.filter((v) => v.vote === 'dispute').length,
             reporter: reporterTag(r.reporter),
             voters: rv.map((v) => ({ voter: reporterTag(v.voter), vote: v.vote })),
-            expiresInMin: Math.max(0, Math.round((Number(r.expiresAtBlock - timing.currentBlock) * timing.blockSeconds) / 6) / 10),
+            expiresInMin: Math.max(
+              0,
+              Math.round((Number(r.expiresAtBlock - timing.currentBlock) * timing.blockSeconds) / 6) / 10,
+            ),
             explorer: {
               entity: arkivExplorerEntity(r.key),
               tx: txs.get(r.key) ? arkivExplorerTx(txs.get(r.key)!) : null,

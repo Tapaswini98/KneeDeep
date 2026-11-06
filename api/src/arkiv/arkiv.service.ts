@@ -24,7 +24,8 @@ export class ArkivService {
   }
 
   get wallet(): ArkivWalletClient {
-    if (!this.writer) throw new ServiceUnavailableException('Arkiv writes disabled: ARKIV_PRIVATE_KEY is not set');
+    if (!this.writer)
+      throw new ServiceUnavailableException('Arkiv writes disabled: ARKIV_PRIVATE_KEY is not set');
     return this.writer;
   }
 

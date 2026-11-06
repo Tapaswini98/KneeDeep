@@ -5,13 +5,33 @@ const CELL = 'te7uc8t';
 const min = (m: number) => NOW - m * 60;
 
 let seq = 0;
-function report(reporter: string, level: ReportInput['level'], agoMin: number, extra: Partial<ReportInput> = {}) {
-  return { key: `0xr${++seq}`, cell: CELL, level, reportedAt: min(agoMin), reporter, source: 'live', ...extra } as ReportInput;
+function report(
+  reporter: string,
+  level: ReportInput['level'],
+  agoMin: number,
+  extra: Partial<ReportInput> = {},
+) {
+  return {
+    key: `0xr${++seq}`,
+    cell: CELL,
+    level,
+    reportedAt: min(agoMin),
+    reporter,
+    source: 'live',
+    ...extra,
+  } as ReportInput;
 }
-function vote(r: ReportInput, voter: string, v: VoteInput['vote'], agoMin: number, extra: Partial<VoteInput> = {}) {
+function vote(
+  r: ReportInput,
+  voter: string,
+  v: VoteInput['vote'],
+  agoMin: number,
+  extra: Partial<VoteInput> = {},
+) {
   return { report: r.key, vote: v, voter, votedAt: min(agoMin), source: 'live', ...extra } as VoteInput;
 }
-const fuseOne = (reports: ReportInput[], votes: VoteInput[] = []) => fuseCell(CELL, reports, votes, { now: NOW })!;
+const fuseOne = (reports: ReportInput[], votes: VoteInput[] = []) =>
+  fuseCell(CELL, reports, votes, { now: NOW })!;
 
 describe('recency weighting', () => {
   it('halves every half-life', () => {
@@ -50,8 +70,16 @@ describe('corroboration', () => {
     const a = fuseOne([report('a', 'knee', 12), report('b', 'knee', 20), report('c', 'knee', 25)]);
     expect(a.level).toBe('knee');
     expect(a.confidenceLabel).toBe('high');
-    expect(a.inputs).toMatchObject({ supportingHumans: 3, reports: 3, disputes: 0, newestAgeMin: 12, oldestAgeMin: 25 });
-    expect(a.explanation).toBe('3 independent humans report knee-deep water; newest 12 min ago, oldest 25 min ago.');
+    expect(a.inputs).toMatchObject({
+      supportingHumans: 3,
+      reports: 3,
+      disputes: 0,
+      newestAgeMin: 12,
+      oldestAgeMin: 25,
+    });
+    expect(a.explanation).toBe(
+      '3 independent humans report knee-deep water; newest 12 min ago, oldest 25 min ago.',
+    );
   });
 
   it('counts each human once: a repeat reporter does not corroborate themselves', () => {
@@ -125,7 +153,9 @@ describe('labels, sources and cells', () => {
 
   it('reports the data source honestly', () => {
     expect(fuseOne([report('a', 'knee', 5, { source: 'simulated' })]).source).toBe('simulated');
-    expect(fuseOne([report('a', 'knee', 5), report('b', 'knee', 5, { source: 'simulated' })]).source).toBe('mixed');
+    expect(fuseOne([report('a', 'knee', 5), report('b', 'knee', 5, { source: 'simulated' })]).source).toBe(
+      'mixed',
+    );
   });
 
   it('fuses each cell independently and omits cells with nothing fresh', () => {

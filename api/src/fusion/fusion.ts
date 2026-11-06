@@ -83,7 +83,10 @@ export const DEFAULT_HALF_LIFE_MIN = 45;
 export const DEFAULT_MAX_AGE_MIN = 180;
 const FUTURE_TOLERANCE_S = 60;
 
-const SEVERITY: Record<Level, number> = Object.fromEntries(LEVELS.map((l, i) => [l, i])) as Record<Level, number>;
+const SEVERITY: Record<Level, number> = Object.fromEntries(LEVELS.map((l, i) => [l, i])) as Record<
+  Level,
+  number
+>;
 
 const PHRASE: Record<Level, string> = {
   dry: 'a dry road',

@@ -17,13 +17,17 @@ export interface PaywallOptions {
   network: Network;
   payTo: string;
   priceTinybars: bigint;
-  onSettled: (queryId: string, settlement: { txId: string; payer?: string; network: string }) => Promise<void>;
+  onSettled: (
+    queryId: string,
+    settlement: { txId: string; payer?: string; network: string },
+  ) => Promise<void>;
   onSettleFailed: (queryId: string | undefined, error: Error) => void;
 }
 
 /** Response headers the handler set, as the x402 HTTP transport hands them to settle hooks. */
 function queryIdFrom(transportContext: unknown): string | undefined {
-  const headers = (transportContext as { responseHeaders?: Record<string, string> } | undefined)?.responseHeaders;
+  const headers = (transportContext as { responseHeaders?: Record<string, string> } | undefined)
+    ?.responseHeaders;
   return headers?.[QUERY_ID_HEADER];
 }
 

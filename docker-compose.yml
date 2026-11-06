@@ -6,13 +6,31 @@ services:
       POSTGRES_PASSWORD: kneedeep
       POSTGRES_DB: kneedeep
     ports:
-      - "5434:5432"
+      - '5434:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kneedeep"]
+      test: ['CMD-SHELL', 'pg_isready -U kneedeep']
       interval: 2s
       timeout: 3s
       retries: 20
+
+  # The whole app in one container (API + built web app on :8080). Opt in with:
+  #   docker compose --profile app up --build
+  # It runs with NODE_ENV=production, so .env must pass the production checks
+  # (World ID mode, production World environment, real secrets).
+  app:
+    profiles: [app]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://kneedeep:kneedeep@postgres:5432/kneedeep
+      MIGRATE_ON_BOOT: 'true'
+    ports:
+      - '8080:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:

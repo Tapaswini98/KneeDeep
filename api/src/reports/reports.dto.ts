@@ -9,14 +9,10 @@ const point = {
 const inMumbai = (p: { lat: number; lng: number }) => isInMumbai(p.lat, p.lng);
 const MUMBAI_ONLY = { message: 'KneeDeep currently covers Mumbai only' };
 
-export const submitReportSchema = z
-  .object({ level: z.enum(LEVELS), ...point })
-  .refine(inMumbai, MUMBAI_ONLY);
+export const submitReportSchema = z.object({ level: z.enum(LEVELS), ...point }).refine(inMumbai, MUMBAI_ONLY);
 
 /** lat/lng is where the voter is now: only people near a report may vote on it. */
-export const submitVoteSchema = z
-  .object({ vote: z.enum(VOTES), ...point })
-  .refine(inMumbai, MUMBAI_ONLY);
+export const submitVoteSchema = z.object({ vote: z.enum(VOTES), ...point }).refine(inMumbai, MUMBAI_ONLY);
 
 export const MAX_LIVE_RADIUS_M = 20_000;
 

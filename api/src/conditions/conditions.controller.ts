@@ -1,4 +1,11 @@
-import { BadRequestException, Controller, Get, Query, Res, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Query,
+  Res,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { QUERY_ID_HEADER } from '../payments/paywall';
 import { PaymentsService } from '../payments/payments.service';

@@ -8,8 +8,8 @@ people with many accounts cannot fake a flood or outvote the truth.
 
 ## Why Proof of Human is the minimum sufficient credential
 
-KneeDeep needs to know exactly one thing about a reporter: *is this a different person from
-the other reporters?* Corroboration ("3 independent humans") only means something if the
+KneeDeep needs to know exactly one thing about a reporter: _is this a different person from
+the other reporters?_ Corroboration ("3 independent humans") only means something if the
 three are really three people.
 
 - **Proof of Human answers that and nothing more.** It reveals no name, age, nationality or
@@ -55,10 +55,10 @@ session avoids both problems. Every report still traces back to one verified hum
 
 ## Integration notes (fill in during the event)
 
-| | |
-|---|---|
-| Time to first successful verification | _TODO_ |
-| Environment used for the demo | _production (World App) / staging (simulator)_ |
+|                                       |                                                |
+| ------------------------------------- | ---------------------------------------------- |
+| Time to first successful verification | _TODO_                                         |
+| Environment used for the demo         | _production (World App) / staging (simulator)_ |
 
 ### Friction
 

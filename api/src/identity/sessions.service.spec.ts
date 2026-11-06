@@ -15,7 +15,10 @@ describe('SessionsService', () => {
     expect(s.method).toBe('dev');
     expect(s.source).toBe('simulated');
     expect(Buffer.from(s.token.split('.')[0], 'base64url').toString()).not.toContain('asha-1');
-    expect(sessions.authenticate(`Bearer ${s.token}`)).toEqual({ pseudonym: pseudonymFor('salt', 'dev:asha-1'), method: 'dev' });
+    expect(sessions.authenticate(`Bearer ${s.token}`)).toEqual({
+      pseudonym: pseudonymFor('salt', 'dev:asha-1'),
+      method: 'dev',
+    });
   });
 
   it('gives the same human the same pseudonym every time', async () => {
@@ -34,7 +37,11 @@ describe('SessionsService', () => {
   });
 
   it('rejects an expired session', async () => {
-    const shortLived = new SessionsService({ ...config, REPORTER_SESSION_HOURS: -1 } as AppConfig, new DevVerifier(), db);
+    const shortLived = new SessionsService(
+      { ...config, REPORTER_SESSION_HOURS: -1 } as AppConfig,
+      new DevVerifier(),
+      db,
+    );
     const { token } = await shortLived.open({ devId: 'kabir' });
     expect(() => shortLived.authenticate(`Bearer ${token}`)).toThrow('expired');
   });

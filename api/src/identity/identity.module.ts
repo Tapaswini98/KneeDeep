@@ -18,12 +18,16 @@ import { WorldIdVerifier } from './world-id.verifier';
           log.warn('REPORTER_VERIFIER=dev: no proof of human; all reports are SIMULATED');
           return new DevVerifier();
         }
-        log.log(`World ID verification (${config.WORLD_ENVIRONMENT}, action "${config.WORLD_ACTION}")`);
+        log.log(
+          `World ID verification (${config.WORLD_ENVIRONMENT}, action "${config.WORLD_ACTION}", ` +
+            `legacy 3.0 proofs ${config.WORLD_ALLOW_LEGACY_PROOFS ? 'allowed' : 'rejected'})`,
+        );
         return new WorldIdVerifier({
           rpId: config.WORLD_RP_ID,
           action: config.WORLD_ACTION,
           environment: config.WORLD_ENVIRONMENT,
           baseUrl: config.WORLD_VERIFY_BASE_URL,
+          allowLegacy: config.WORLD_ALLOW_LEGACY_PROOFS,
         });
       },
     },

@@ -27,12 +27,19 @@ export class ConditionsService {
     const prefixes = prefixesCovering(lat, lng, radiusM);
     const { reports, votes, block } = await this.store.findInArea(prefixes);
     const point = { lat, lng };
-    const nearby = reports.filter((r) => distanceMeters(point, cellCenter(r.cell)) <= radiusM + CELL_HALF_DIAGONAL_M);
+    const nearby = reports.filter(
+      (r) => distanceMeters(point, cellCenter(r.cell)) <= radiusM + CELL_HALF_DIAGONAL_M,
+    );
 
     const cells = fuse(nearby, votes, { now: Date.now() / 1000 })
       .map((a) => ({ a, distanceM: Math.round(distanceMeters(point, cellCenter(a.cell))) }))
       // Worst first (contested counts as worst: unknown is not safe), then most confident, then nearest.
-      .sort((x, y) => severity(y.a.level) - severity(x.a.level) || y.a.confidence - x.a.confidence || x.distanceM - y.distanceM);
+      .sort(
+        (x, y) =>
+          severity(y.a.level) - severity(x.a.level) ||
+          y.a.confidence - x.a.confidence ||
+          x.distanceM - y.distanceM,
+      );
 
     const sources = new Set(cells.map(({ a }) => a.source));
     const dataStatus: DataStatus =

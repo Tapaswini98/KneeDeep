@@ -7,7 +7,9 @@ export interface MirrorAccount {
 }
 
 export async function fetchAccount(mirrorUrl: string, accountId: string): Promise<MirrorAccount> {
-  const res = await fetch(`${mirrorUrl}/api/v1/accounts/${accountId}`, { signal: AbortSignal.timeout(10_000) });
+  const res = await fetch(`${mirrorUrl}/api/v1/accounts/${accountId}`, {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (res.status === 404) throw new Error(`Account ${accountId} not found on this network`);
   if (!res.ok) throw new Error(`Mirror node ${res.status} for account ${accountId}`);
   return (await res.json()) as MirrorAccount;

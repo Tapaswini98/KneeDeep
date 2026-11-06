@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  Inject,
+  Post,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { signRequest } from './idkit';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { HUMAN_VERIFIER, HumanVerifier, WORLD_SIGNAL } from './human-verifier';
@@ -17,9 +27,17 @@ export class IdentityController {
    * here: the signing key never leaves the server. Signatures live 5 minutes.
    */
   @Get('context')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
   context() {
     if (this.verifier.name === 'dev') return { mode: 'dev' as const };
-    const { WORLD_APP_ID, WORLD_RP_ID, WORLD_RP_SIGNING_KEY, WORLD_ACTION, WORLD_ENVIRONMENT } = this.config;
+    const {
+      WORLD_APP_ID,
+      WORLD_RP_ID,
+      WORLD_RP_SIGNING_KEY,
+      WORLD_ACTION,
+      WORLD_ENVIRONMENT,
+      WORLD_ALLOW_LEGACY_PROOFS,
+    } = this.config;
     if (!WORLD_APP_ID || !WORLD_RP_ID || !WORLD_RP_SIGNING_KEY) {
       throw new ServiceUnavailableException('World ID is not configured');
     }
@@ -30,6 +48,7 @@ export class IdentityController {
       action: WORLD_ACTION,
       environment: WORLD_ENVIRONMENT,
       signal: WORLD_SIGNAL,
+      allow_legacy_proofs: WORLD_ALLOW_LEGACY_PROOFS,
       rp_context: {
         rp_id: WORLD_RP_ID,
         nonce: sig.nonce,
@@ -40,9 +59,16 @@ export class IdentityController {
     };
   }
 
+  /** 200 if the session in `Authorization: Bearer …` is still valid in the current mode, else 401. */
+  @Get('me')
+  me(@Headers('authorization') auth: string | undefined) {
+    return this.sessions.describe(auth);
+  }
+
   /** Exchange a proof of human (the IDKit result, untouched) for a reporter session. */
   @Post('session')
   @HttpCode(201)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
   open(@Body() body: { proof?: unknown }) {
     return this.sessions.open(body?.proof);
   }

@@ -60,19 +60,32 @@ export class SessionsService {
     };
   }
 
+  /** Whether a stored session is still accepted; lets the browser drop stale ones on load. */
+  describe(authorization: string | undefined) {
+    const who = this.authenticate(authorization);
+    return { reporter: who.pseudonym.slice(0, 12), method: who.method, mode: this.verifier.name };
+  }
+
   /** From an `Authorization: Bearer <token>` header. Throws 401 if absent, forged or expired. */
   authenticate(authorization: string | undefined): Reporter {
     const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     if (!token) throw new UnauthorizedException('Verify with World ID first (missing reporter session)');
     const [payload, sig] = token.split('.');
     const expected = this.sign(payload ?? '');
-    if (!payload || !sig || sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+    if (
+      !payload ||
+      !sig ||
+      sig.length !== expected.length ||
+      !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
+    ) {
       throw new UnauthorizedException('Invalid reporter session');
     }
     const claims = JSON.parse(Buffer.from(payload, 'base64url').toString()) as Claims;
-    if (claims.exp < Date.now() / 1000) throw new UnauthorizedException('Reporter session expired; verify again');
+    if (claims.exp < Date.now() / 1000)
+      throw new UnauthorizedException('Reporter session expired; verify again');
     // A dev session must never pass as a real human after switching to World ID mode.
-    if (claims.m !== this.verifier.name) throw new UnauthorizedException('Session was issued by another verifier');
+    if (claims.m !== this.verifier.name)
+      throw new UnauthorizedException('Session was issued by another verifier');
     return { pseudonym: claims.sub, method: claims.m };
   }
 }

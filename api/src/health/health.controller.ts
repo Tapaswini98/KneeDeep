@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ArkivService } from '../arkiv/arkiv.service';
 import { DbService } from '../db/db.service';
 import { HederaService } from '../hedera/hedera.service';
@@ -15,7 +16,12 @@ async function check(fn: () => Promise<string | undefined>): Promise<Check> {
   }
 }
 
-/** One glance tells you which integration is down. Free endpoint; never behind x402. */
+/**
+ * GET /health/live  process is up (cheap; for container liveness probes).
+ * GET /health       readiness: Postgres, Arkiv and Hedera, one glance at which is down.
+ * Free endpoints, never behind x402 or rate limits.
+ */
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
   constructor(
@@ -23,6 +29,11 @@ export class HealthController {
     private readonly arkiv: ArkivService,
     private readonly hedera: HederaService,
   ) {}
+
+  @Get('live')
+  live() {
+    return { ok: true };
+  }
 
   @Get()
   async health() {
@@ -33,7 +44,8 @@ export class HealthController {
       }),
       check(async () => {
         const block = await this.arkiv.blockNumber();
-        if (!this.arkiv.writerAddress) throw new Error(`block ${block}, but ARKIV_PRIVATE_KEY is not set (read-only)`);
+        if (!this.arkiv.writerAddress)
+          throw new Error(`block ${block}, but ARKIV_PRIVATE_KEY is not set (read-only)`);
         return `block ${block}, writer ${this.arkiv.writerAddress}`;
       }),
       check(async () => {

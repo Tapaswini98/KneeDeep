@@ -9,6 +9,7 @@ export type IdentityContext =
       action: string;
       environment: 'production' | 'staging';
       signal: string;
+      allow_legacy_proofs: boolean;
       rp_context: RpContext;
     };
 

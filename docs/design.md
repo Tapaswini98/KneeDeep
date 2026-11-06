@@ -1,6 +1,6 @@
 # KneeDeep design decisions
 
-KneeDeep answers one question for an AI agent: *is this road usable right now?* The answer
+KneeDeep answers one question for an AI agent: _is this road usable right now?_ The answer
 comes from recent reports by verified humans, never from a model. This document explains the
 choices behind that answer.
 
@@ -17,8 +17,8 @@ layer, not to a cleanup job:
   ever raised by mistake.
 - Every answer shows the age of its evidence: the newest and oldest report, in minutes.
 
-When nothing fresh remains, the answer is `dataStatus: "empty"` with the notice *"Absence of
-reports is not evidence of a dry road."* No reports never means the road is dry.
+When nothing fresh remains, the answer is `dataStatus: "empty"` with the notice _"Absence of
+reports is not evidence of a dry road."_ No reports never means the road is dry.
 
 ## 2. Confidence you can explain
 
@@ -37,7 +37,7 @@ The engine is in `api/src/fusion/fusion.ts` and is deterministic. For each ~150 
      level (1 → 0.5, 2 → 0.75, 3 → 0.875). **A single human can never reach "high".**
    - `agreement = support / (support + against)`. Contradicting reports and disputes reduce it.
    - `freshness = 0.5 + 0.5 × w(newest supporting evidence)`.
-   - Labels: `high` needs ≥ 0.7 *and* ≥ 2 supporting humans; `medium` ≥ 0.4; otherwise `low`.
+   - Labels: `high` needs ≥ 0.7 _and_ ≥ 2 supporting humans; `medium` ≥ 0.4; otherwise `low`.
 
 Every area in the paid answer carries the score's inputs (`supportingHumans`, `reports`,
 `contradictingReports`, `confirmations`, `disputes`, `newestAgeMin`, `oldestAgeMin`) and a
@@ -56,7 +56,7 @@ KneeDeep handles this in layers:
 - **Sybil resistance:** one person cannot pose as many (World ID nullifier → pseudonym).
 - **Rate limit:** one report per human per cell per 30 minutes. A Postgres reservation row
   and an advisory lock make this race-free even though Arkiv writes take seconds.
-- **Corroboration:** confidence grows only with *independent* humans.
+- **Corroboration:** confidence grows only with _independent_ humans.
 - **Incentives:** only corroborated reports earn, so a lone false flood report earns nothing.
 - **Locality:** only people within 1 km of a report can confirm or dispute it.
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, Health } from './lib/api';
+import { VerifyGate } from './components/VerifyGate';
+import { api, type Health } from './lib/api';
 import { MapPage } from './pages/MapPage';
 import { ReportPage } from './pages/ReportPage';
 
@@ -50,6 +51,7 @@ export function App() {
         </span>
       </header>
       <main>{route === '/report' ? <ReportPage /> : <MapPage />}</main>
+      <VerifyGate />
     </div>
   );
 }

@@ -13,7 +13,10 @@ const RUN = process.argv.find((a) => a.startsWith('--run='))?.slice(6) ?? Date.n
 
 const ANDHERI_SUBWAY = { lat: 19.1197, lng: 72.8464 };
 const MILAN_SUBWAY = { lat: 19.0833, lng: 72.8427 };
-const jitter = (p: { lat: number; lng: number }, i: number) => ({ lat: p.lat + 0.0002 * (i % 3), lng: p.lng + 0.0001 * (i % 2) });
+const jitter = (p: { lat: number; lng: number }, i: number) => ({
+  lat: p.lat + 0.0002 * (i % 3),
+  lng: p.lng + 0.0001 * (i % 2),
+});
 
 async function post(path: string, body: unknown, token?: string) {
   const res = await fetch(`${API}${path}`, {
@@ -48,7 +51,11 @@ async function main() {
     console.log(`${name.padEnd(6)} reports knee  at Andheri subway  ${r.cell}  ${r.explorer}`);
   }
 
-  const v = await post(`/v1/reports/${keys[0]}/votes`, { vote: 'confirm', ...ANDHERI_SUBWAY }, await as('kabir'));
+  const v = await post(
+    `/v1/reports/${keys[0]}/votes`,
+    { vote: 'confirm', ...ANDHERI_SUBWAY },
+    await as('kabir'),
+  );
   console.log(`kabir  confirms asha's report               ${v.explorer}`);
 
   const m = await post('/v1/reports', { level: 'ankle', ...MILAN_SUBWAY }, await as('farah'));

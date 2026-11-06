@@ -3,12 +3,14 @@ import { WORLD_SIGNAL } from './human-verifier';
 import { hashSignal } from './idkit';
 import { WorldIdVerifier } from './world-id.verifier';
 
-const verifier = new WorldIdVerifier({
+const options = {
   rpId: 'rp_test',
   action: 'submit-report',
-  environment: 'production',
+  environment: 'production' as const,
   baseUrl: 'https://world.test',
-});
+};
+const verifier = new WorldIdVerifier({ ...options, allowLegacy: false });
+const legacyVerifier = new WorldIdVerifier({ ...options, allowLegacy: true });
 
 const NULLIFIER_HEX = '0x' + 'ab'.repeat(32);
 
@@ -44,9 +46,12 @@ const worldSays = (status: number, body: unknown) =>
 
 describe('WorldIdVerifier', () => {
   it('accepts a valid Proof of Human and returns a normalised nullifier', async () => {
-    worldSays(200, { success: true, results: [{ identifier: 'proof_of_human', success: true, nullifier: NULLIFIER_HEX }] });
+    worldSays(200, {
+      success: true,
+      results: [{ identifier: 'proof_of_human', success: true, nullifier: NULLIFIER_HEX }],
+    });
     const human = await verifier.verify(proof());
-    expect(human).toEqual({ method: 'world', nullifier: `world:${BigInt(NULLIFIER_HEX).toString()}` });
+    expect(human).toEqual({ method: 'world', nullifier: `world:v4:${BigInt(NULLIFIER_HEX).toString()}` });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://world.test/api/v4/verify/rp_test');
     expect(JSON.parse(init.body).environment).toBe('production');
@@ -58,13 +63,15 @@ describe('WorldIdVerifier', () => {
       results: [{ identifier: 'proof_of_human', success: true, nullifier: BigInt(NULLIFIER_HEX).toString() }],
     });
     const decimal = await verifier.verify(proof());
-    worldSays(200, { success: true, results: [{ identifier: 'proof_of_human', success: true, nullifier: NULLIFIER_HEX }] });
+    worldSays(200, {
+      success: true,
+      results: [{ identifier: 'proof_of_human', success: true, nullifier: NULLIFIER_HEX }],
+    });
     expect((await verifier.verify(proof())).nullifier).toBe(decimal.nullifier);
   });
 
   it.each([
     ['no proof at all', undefined],
-    ['a legacy 3.0 proof', proof({ protocol_version: '3.0' })],
     ['a proof for another action', proof({ action: 'claim-airdrop' })],
     ['a staging proof in production', proof({ environment: 'staging' })],
     ['a proof bound to another signal', proof({}, { signal_hash: hashSignal('someone-else') })],
@@ -76,12 +83,38 @@ describe('WorldIdVerifier', () => {
   });
 
   it('rejects when World says the proof is invalid', async () => {
-    worldSays(400, { success: false, code: 'all_verifications_failed', detail: 'All proof verifications failed.' });
+    worldSays(400, {
+      success: false,
+      code: 'all_verifications_failed',
+      detail: 'All proof verifications failed.',
+    });
     await expect(verifier.verify(proof())).rejects.toThrow('All proof verifications failed.');
   });
 
   it('rejects success when Proof of Human itself did not pass', async () => {
     worldSays(200, { success: true, results: [{ identifier: 'proof_of_human', success: false }] });
     await expect(verifier.verify(proof())).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('explains a legacy 3.0 proof when legacy proofs are off', async () => {
+    await expect(verifier.verify(proof({ protocol_version: '3.0' }, { identifier: 'orb' }))).rejects.toThrow(
+      'WORLD_ALLOW_LEGACY_PROOFS',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a legacy Orb proof when allowed, under a separate v3 identity', async () => {
+    worldSays(200, {
+      success: true,
+      results: [{ identifier: 'orb', success: true, nullifier: NULLIFIER_HEX }],
+    });
+    const human = await legacyVerifier.verify(proof({ protocol_version: '3.0' }, { identifier: 'orb' }));
+    expect(human.nullifier).toBe(`world:v3:${BigInt(NULLIFIER_HEX).toString()}`);
+  });
+
+  it('still rejects a legacy device-only proof when legacy is allowed', async () => {
+    await expect(
+      legacyVerifier.verify(proof({ protocol_version: '3.0' }, { identifier: 'device' })),
+    ).rejects.toThrow('got: device');
   });
 });
