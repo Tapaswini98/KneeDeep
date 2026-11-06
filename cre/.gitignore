@@ -1,0 +1,10 @@
+.env
+node_modules/
+dist/
+*.wasm
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+.cre_build_tmp.js
+**/.cre_build_tmp.js

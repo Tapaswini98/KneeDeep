@@ -1,0 +1,6 @@
+# CRE project settings: the chains the workflow talks to, per target.
+# The workflow itself is in kneedeep-verify/ (see its workflow.yaml).
+staging-settings:
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: https://ethereum-sepolia-rpc.publicnode.com

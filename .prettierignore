@@ -3,3 +3,8 @@ node_modules/
 coverage/
 package-lock.json
 *.sql
+# Build output of the CRE compiler and Foundry
+.cre_build_tmp.js
+cre/contracts/out/
+cre/contracts/cache/
+cre/contracts/broadcast/

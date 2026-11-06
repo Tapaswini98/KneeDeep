@@ -1,0 +1,21 @@
+{
+  "name": "kneedeep-verify",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chainlink CRE workflow: independently recompute KneeDeep's flood answers from public Arkiv evidence and attest them on Sepolia.",
+  "main": "dist/main.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@chainlink/cre-sdk": "1.23.0",
+    "viem": "2.57.16",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.10",
+    "typescript": "5.9.3"
+  }
+}
