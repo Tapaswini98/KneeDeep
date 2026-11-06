@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kneedeep
+      POSTGRES_PASSWORD: kneedeep
+      POSTGRES_DB: kneedeep
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kneedeep"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  pgdata:

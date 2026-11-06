@@ -1,0 +1,50 @@
+{
+  "name": "@kneedeep/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "dev": "nest start --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "jest",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:reset": "tsx scripts/migrate.ts --reset",
+    "arkiv:wallet": "tsx scripts/arkiv-wallet.ts",
+    "arkiv:smoke": "tsx scripts/arkiv-smoke.ts",
+    "hedera:balance": "tsx scripts/hedera-balance.ts"
+  },
+  "dependencies": {
+    "@arkiv-network/sdk": "1.0.1",
+    "@hiero-ledger/sdk": "2.90.1",
+    "@nestjs/common": "11.2.8",
+    "@nestjs/core": "11.2.8",
+    "@nestjs/platform-express": "11.2.8",
+    "@nestjs/schedule": "6.1.3",
+    "@worldcoin/idkit-core": "4.6.0",
+    "@x402/core": "2.30.0",
+    "@x402/express": "2.30.0",
+    "@x402/hedera": "2.30.0",
+    "dotenv": "16.6.1",
+    "express": "5.3.0",
+    "ngeohash": "0.6.4",
+    "pg": "8.23.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "viem": "2.57.7",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "11.0.24",
+    "@nestjs/testing": "11.2.8",
+    "@types/express": "5.0.6",
+    "@types/jest": "29.5.14",
+    "@types/ngeohash": "0.6.8",
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.15",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
