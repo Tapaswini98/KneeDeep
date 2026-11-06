@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Logger,
   Get,
   Headers,
   HttpCode,
@@ -57,6 +58,19 @@ export class IdentityController {
         signature: sig.sig,
       },
     };
+  }
+
+  /**
+   * The browser reports World ID failures that happen before a proof exists (World App or the
+   * simulator declined, bridge timeout…), so they show up in the server logs. Logged, never stored.
+   */
+  @Post('client-error')
+  @HttpCode(204)
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  clientError(@Body() body: { code?: unknown; debug?: unknown }) {
+    const code = typeof body?.code === 'string' ? body.code.slice(0, 64) : 'unknown';
+    const debug = JSON.stringify(body?.debug ?? null).slice(0, 2_000);
+    new Logger('WorldIdClient').warn(`World ID failed in the browser: ${code} ${debug}`);
   }
 
   /** 200 if the session in `Authorization: Bearer …` is still valid in the current mode, else 401. */

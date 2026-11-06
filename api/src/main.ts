@@ -34,7 +34,15 @@ async function bootstrap() {
   app.disable('x-powered-by');
   // Security headers. CSP is off for now: the bundled web app loads OpenStreetMap tiles and the
   // World ID widget talks to World's bridge; a tested CSP for both is a follow-up.
-  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      // OpenStreetMap's tile servers refuse browser requests without a Referer (helmet's default is
+      // no-referrer). This browser default sends only our origin cross-site, never page paths.
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    }),
+  );
   app.use(requestContext);
   // IDKit proofs are a few KB; nothing legitimate is larger.
   app.use(jsonBody('64kb'));

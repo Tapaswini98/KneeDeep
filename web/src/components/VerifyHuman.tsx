@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { IDKitRequestWidget, proofOfHuman } from '@worldcoin/idkit';
 import { errorText } from '../lib/actions';
+import { api } from '../lib/api';
 import {
   fetchIdentityContext,
   type IdentityContext,
@@ -25,6 +26,13 @@ const WORLD_ERRORS: Record<string, string> = {
   connection_failed: 'Could not connect to World App. Scan the QR code again.',
   timeout: 'Timed out waiting for World App.',
 };
+
+function reportWorldError(code: string, debugReport: unknown): Promise<unknown> {
+  return api('/v1/identity/client-error', {
+    method: 'POST',
+    body: JSON.stringify({ code, debug: debugReport ?? null }),
+  }).catch(() => undefined);
+}
 
 /**
  * Proof of Human, once per session. The IDKit result goes to our server untouched;
@@ -96,7 +104,15 @@ export function VerifyHuman({ onVerified }: { onVerified: (s: ReporterSession) =
             }
           }}
           onSuccess={() => setOpen(false)}
-          onError={(code) => setError(WORLD_ERRORS[code] ?? `World ID error: ${code}`)}
+          onError={(code, debugReport) => {
+            setError(
+              `${WORLD_ERRORS[code] ?? 'World ID could not complete the verification.'} (code: ${code})`,
+            );
+            // The proof never reached our server, so report what World's SDK saw: it makes
+            // simulator / World App failures visible in the server logs.
+            console.warn('World ID error', code, debugReport);
+            void reportWorldError(code, debugReport);
+          }}
         />
       )}
     </div>
