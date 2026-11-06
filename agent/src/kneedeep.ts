@@ -16,6 +16,8 @@ export interface Catalog {
 }
 
 export type Level = 'dry' | 'ankle' | 'knee' | 'waist' | 'closed';
+export type Passability = 'safe' | 'risky' | 'blocked' | 'unknown';
+export type Vehicle = 'two_wheeler';
 
 export interface Area {
   cell: string;
@@ -26,6 +28,10 @@ export interface Area {
   confidence: number;
   confidenceLabel: 'high' | 'medium' | 'low';
   explanation: string;
+  /** Computed by KneeDeep from the evidence for the requested vehicle. */
+  passability: Passability;
+  passabilityReason: string;
+  evidenceAgeMin: number;
   inputs: { supportingHumans: number; newestAgeMin: number; disputes: number };
   source: 'live' | 'simulated' | 'mixed';
 }
@@ -35,6 +41,8 @@ export interface ConditionsAnswer {
   generatedAt: string;
   dataStatus: 'live' | 'simulated' | 'mixed' | 'empty';
   notices: string[];
+  /** One verdict for the queried point: the worst area within the radius decides (unknown if none). */
+  assessment: { vehicle: Vehicle; passability: Passability; reason: string; decidedBy: string | null };
   areas: Area[];
 }
 
@@ -111,8 +119,13 @@ export class KneeDeepClient {
   }
 
   /** Paid. 402 -> sign HBAR transfer -> retry -> answer + settled transaction. */
-  async conditions(lat: number, lng: number, radiusM: number): Promise<PaidAnswer> {
-    const url = `${this.baseUrl}/v1/conditions?lat=${lat}&lng=${lng}&radius=${radiusM}`;
+  async conditions(
+    lat: number,
+    lng: number,
+    radiusM: number,
+    vehicle: Vehicle = 'two_wheeler',
+  ): Promise<PaidAnswer> {
+    const url = `${this.baseUrl}/v1/conditions?lat=${lat}&lng=${lng}&radius=${radiusM}&vehicle=${vehicle}`;
     const res = await this.paidFetch(url, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new Error(`GET /v1/conditions -> ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
@@ -129,5 +142,20 @@ export class KneeDeepClient {
           }
         : undefined,
     };
+  }
+
+  /**
+   * Free, but authenticated: record this trip's decision on the KneeDeep dashboard. The token
+   * (AGENT_API_TOKEN, shared with the server) keeps the public from posting made-up trips.
+   */
+  async recordTrip(trip: unknown, token: string): Promise<{ id: string }> {
+    const res = await fetch(`${this.baseUrl}/v1/trips`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(trip),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`POST /v1/trips -> ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    return (await res.json()) as { id: string };
   }
 }

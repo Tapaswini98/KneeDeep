@@ -3,6 +3,7 @@ import { ArkivStore } from '../arkiv/arkiv.store';
 import { LEVELS, Level } from '../arkiv/schemas';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { CellAnswer, fuse } from '../fusion/fusion';
+import { assessPoint, derivePassability, STALE_AFTER_MIN, type Vehicle } from '../fusion/passability';
 import { cellCenter, distanceMeters, prefixesCovering } from '../geo/geo';
 import { DataStatus } from '../queries/queries.repository';
 import { CELL_HALF_DIAGONAL_M } from '../reports/reports.service';
@@ -25,7 +26,7 @@ export class ConditionsService {
   ) {}
 
   /** Read live evidence from Arkiv, fuse it per cell, and say exactly what the answer rests on. */
-  async answer(lat: number, lng: number, radiusM: number) {
+  async answer(lat: number, lng: number, radiusM: number, vehicle: Vehicle) {
     const prefixes = prefixesCovering(lat, lng, radiusM);
     const { reports, votes, block } = await this.store.findInArea(prefixes);
     const point = { lat, lng };
@@ -42,6 +43,14 @@ export class ConditionsService {
           y.a.confidence - x.a.confidence ||
           x.distanceM - y.distanceM,
       );
+
+    const maxAgeMin = Math.round(this.config.REPORT_TTL_SECONDS / 60);
+    const areas = cells.map(({ a, distanceM }) => toArea(a, distanceM, vehicle, maxAgeMin));
+    const verdict = assessPoint(
+      cells.map(({ a }) => a),
+      vehicle,
+      maxAgeMin,
+    );
 
     const sources = new Set(cells.map(({ a }) => a.source));
     const dataStatus: DataStatus =
@@ -75,7 +84,10 @@ export class ConditionsService {
         notices,
         method: {
           recencyHalfLifeMin: 45,
-          maxReportAgeMin: Math.round(this.config.REPORT_TTL_SECONDS / 60),
+          maxReportAgeMin: maxAgeMin,
+          staleAfterMin: STALE_AFTER_MIN,
+          passability:
+            'safe needs 2+ independent humans at medium/high confidence; no data, contested or stale is unknown',
           cellSizeM: 150,
           confidence: 'corroboration x agreement x freshness; see docs/design.md',
         },
@@ -84,13 +96,21 @@ export class ConditionsService {
           writer: this.store.writer,
           note: 'Every report and vote behind this answer is a public, expiring Arkiv entity.',
         },
-        areas: cells.map(({ a, distanceM }) => toArea(a, distanceM)),
+        // The verdict for the queried point: the worst area within the radius decides.
+        assessment: {
+          vehicle,
+          passability: verdict.passability,
+          reason: verdict.reason,
+          decidedBy: verdict.cell,
+        },
+        areas,
       },
     };
   }
 }
 
-function toArea(a: CellAnswer, distanceM: number) {
+function toArea(a: CellAnswer, distanceM: number, vehicle: Vehicle, maxAgeMin: number) {
+  const p = derivePassability(a, vehicle, maxAgeMin);
   return {
     cell: a.cell,
     center: cellCenter(a.cell),
@@ -99,6 +119,10 @@ function toArea(a: CellAnswer, distanceM: number) {
     confidence: a.confidence,
     confidenceLabel: a.confidenceLabel,
     explanation: a.explanation,
+    passability: p.passability,
+    passabilityReason: p.reason,
+    vehicle,
+    evidenceAgeMin: a.inputs.newestEvidenceAgeMin,
     inputs: a.inputs,
     source: a.source,
     reports: a.reports.map((r) => ({

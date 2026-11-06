@@ -80,6 +80,8 @@ export interface CellAnswer {
     disputes: number;
     newestAgeMin: number;
     oldestAgeMin: number;
+    /** Newest evidence of any kind: a report or a confirmation (a fresh confirmation re-observes the street). */
+    newestEvidenceAgeMin: number;
   };
   source: DataSource;
   reports: UsedReport[];
@@ -256,7 +258,8 @@ export function fuseCell(
     .sort((a, b) => a.ageMin - b.ageMin);
 
   const ages = kept.map((r) => ageMin(now, r.reportedAt));
-  const confirmations = keptVotes.filter((v) => v.vote === 'confirm').length;
+  const confirmAges = keptVotes.filter((v) => v.vote === 'confirm').map((v) => ageMin(now, v.votedAt));
+  const confirmations = confirmAges.length;
   const disputes = keptVotes.filter((v) => v.vote === 'dispute').length;
   const contradicting = level ? kept.filter((r) => r.level !== level) : [];
 
@@ -286,6 +289,7 @@ export function fuseCell(
       disputes,
       newestAgeMin: round(Math.min(...ages), 1),
       oldestAgeMin: round(Math.max(...ages), 1),
+      newestEvidenceAgeMin: round(Math.min(...ages, ...confirmAges), 1),
     },
     source,
     reports: used,

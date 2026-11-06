@@ -33,9 +33,9 @@ export class ConditionsController {
 
     const parsed = conditionsQuerySchema.safeParse(raw);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map((i) => i.message));
-    const { lat, lng, radius } = parsed.data;
+    const { lat, lng, radius, vehicle } = parsed.data;
 
-    const result = await this.conditions.answer(lat, lng, radius);
+    const result = await this.conditions.answer(lat, lng, radius, vehicle);
     const queryId = await this.queries.create({
       lat,
       lng,
@@ -51,6 +51,8 @@ export class ConditionsController {
         confidenceLabel: a.confidenceLabel,
         explanation: a.explanation,
         source: a.source,
+        passability: a.passability,
+        passabilityReason: a.passabilityReason,
       })),
     });
     res.setHeader(QUERY_ID_HEADER, queryId);

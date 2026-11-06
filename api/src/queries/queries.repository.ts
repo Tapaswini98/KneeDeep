@@ -25,6 +25,8 @@ export interface AreaSummary {
   confidenceLabel: string;
   explanation: string;
   source: string;
+  passability?: string;
+  passabilityReason?: string;
 }
 
 export interface RecentQuery {

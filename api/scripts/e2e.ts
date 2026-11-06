@@ -15,8 +15,8 @@ import { asc } from '@arkiv-network/sdk/query';
 import { u64 } from '@arkiv-network/sdk/schema';
 import { Client } from 'pg';
 import { KneeDeepClient } from '../../agent/src/kneedeep';
-import { planTrip } from '../../agent/src/planner';
-import { ROUTES } from '../../agent/src/routes';
+import { planTrip, type TripPlan, tripRecord } from '../../agent/src/planner';
+import { ROUTES, TRIP } from '../../agent/src/routes';
 import { arkivPublicClient, arkivWalletClient } from '../src/arkiv/client';
 import { Reports } from '../src/arkiv/schemas';
 import { readConfig } from '../src/config/config';
@@ -302,6 +302,18 @@ async function main() {
     assert(ours.length > 0, 'seeded reports not found on Arkiv');
     return `${res.entities.length} live entities owned by ${writer.slice(0, 10)}…`;
   });
+  await check('Coverage is free, says how trustworthy each cell is, and never what it says', async () => {
+    const { status, body } = await http('/v1/coverage?bbox=19.0,72.8,19.15,72.9');
+    assert(status === 200, `GET /v1/coverage -> ${status}`);
+    const cells = body.cells as { cell: string; state: string; reason: string }[];
+    const andheri = cells.find((c) => c.cell === toCell(ANDHERI.lat, ANDHERI.lng));
+    assert(andheri, 'Andheri subway not covered');
+    assert(['corroborated', 'conflicting'].includes(andheri.state), `Andheri subway is ${andheri.state}`);
+    const leaks = cells.filter((c) => /\b(dry|ankle|knee|waist|closed)\b/.test(JSON.stringify(c)));
+    assert(leaks.length === 0, `coverage reveals a level: ${JSON.stringify(leaks[0])}`);
+    const states = [...new Set(cells.map((c) => c.state))].join(', ');
+    return `${cells.length} cells (${states}); Andheri subway ${andheri.state}`;
+  });
 
   // -------------------------------------------------------------------------------------------
   section('Hedera x402: agents pay per query');
@@ -317,6 +329,7 @@ async function main() {
 
   let paidTx: string | undefined;
   let paidQueryId: string | undefined;
+  let trip: TripPlan | undefined;
   let lastPaidTx: string | undefined;
   if (!agent) {
     await check('Agent pays and gets an answer', async () => {
@@ -343,7 +356,12 @@ async function main() {
         answer.notices.some((n) => n.includes('SIMULATED')),
         'answer includes simulated data but no SIMULATED notice',
       );
-      return `knee, ${area.confidence} high, data ${answer.dataStatus}: "${area.explanation}"`;
+      assert(area.passability === 'blocked', `expected blocked for a two-wheeler, got ${area.passability}`);
+      assert(
+        answer.assessment.passability === 'blocked',
+        `expected the point to be blocked, got ${answer.assessment.passability}`,
+      );
+      return `knee, ${area.confidence} high, ${area.passability}: "${area.passabilityReason}"`;
     });
     await check('Simulated reports never earn (reporter payouts)', async () => {
       assert(paidQueryId, 'no paid query to inspect');
@@ -374,12 +392,13 @@ async function main() {
       assert(tx.result === 'SUCCESS', `result ${tx.result}`);
       return `SUCCESS, +${toPlatform / 1e8} HBAR to ${config.HEDERA_ACCOUNT_ID}, https://hashscan.io/testnet/transaction/${dashed(paidTx)}`;
     });
-    await check('The clear route reads dry', async () => {
+    await check('The clear route reads dry and safe', async () => {
       const { answer, payment } = await agent.conditions(KALANAGAR.lat, KALANAGAR.lng, 300);
       lastPaidTx = payment?.txId;
       const area = answer.areas.find((a) => a.cell === toCell(KALANAGAR.lat, KALANAGAR.lng));
       assert(area?.level === 'dry', `expected dry at Kalanagar, got ${area?.level ?? 'nothing'}`);
-      return `dry, ${area.confidence} ${area.confidenceLabel}`;
+      assert(area.passability === 'safe', `expected safe (two humans), got ${area.passability}`);
+      return `dry, ${area.confidence} ${area.confidenceLabel}, safe: "${area.passabilityReason}"`;
     });
     await check('The dashboard feed shows the paid query with its HashScan link', async () => {
       const { body } = await http('/v1/activity?limit=5');
@@ -408,15 +427,45 @@ async function main() {
   // -------------------------------------------------------------------------------------------
   if (!QUICK && agent) {
     section('The dispatch agent decides');
-    await check('It pays for every checkpoint on both routes and picks the dry one', async () => {
-      const plan = await planTrip(agent, ROUTES, { radiusM: 250, budgetTinybars: 100_000_000n });
-      const { choice } = plan.decision;
+    await check('It pays for every checkpoint on both routes and picks the safe one', async () => {
+      const plan = await planTrip(agent, ROUTES, {
+        vehicle: 'two_wheeler',
+        radiusM: 250,
+        budgetTinybars: 100_000_000n,
+      });
+      const { choice, outcome, routes } = plan.decision;
       assert(
-        choice?.route.id === 'weh',
-        `expected the Western Express Highway, got ${choice?.route.id ?? 'hold'}`,
+        outcome === 'dispatched' && choice?.route.id === 'weh',
+        `expected the Western Express Highway, got ${choice?.route.id ?? outcome}`,
+      );
+      assert(choice.counts.safe === 3, `expected 3 safe checkpoints, got ${JSON.stringify(choice.counts)}`);
+      assert(
+        routes.find((r) => r.route.id === 'sv-road')?.verdict === 'rejected',
+        'S.V. Road should be rejected (blocked subways)',
       );
       assert(plan.payments.length === 6, `expected 6 payments, got ${plan.payments.length}`);
-      return `${plan.payments.length} payments; "${plan.decision.explanation}"`;
+      trip = plan;
+      return `${plan.payments.length} payments; "${plan.decision.reasons[0]}"`;
+    });
+    await check('Strangers cannot record trips on the dashboard', async () => {
+      const { status } = await post('/v1/trips', {}, 'not-the-agent-token-not-the-agent-token');
+      assert(status === 401 || status === 503, `expected 401 (or 503 if trips are off), got ${status}`);
+      return status === 401 ? '401 without the agent token' : '503: AGENT_API_TOKEN not set on the server';
+    });
+    await check('The agent records the trip, and its payments match the ledger', async () => {
+      const token = env('AGENT_API_TOKEN');
+      assert(trip, 'no trip planned');
+      assert(token, 'AGENT_API_TOKEN not set');
+      const id = (await agent.recordTrip(tripRecord(trip, TRIP), token)).id;
+      const { status, body } = await http(`/v1/trips/${id}`);
+      assert(status === 200, `GET /v1/trips/${id} -> ${status}`);
+      assert(
+        body.outcome === 'dispatched' && body.chosenRoute === 'weh',
+        `recorded ${body.outcome} ${body.chosenRoute}`,
+      );
+      const recorded = body.paymentsRecorded as number;
+      assert(recorded === 6, `${recorded}/6 of the trip's payments are settled queries in the ledger`);
+      return `trip ${id}: dispatched via weh, 6/6 payments in the ledger`;
     });
   }
 
