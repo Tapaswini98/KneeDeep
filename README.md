@@ -30,6 +30,9 @@ flowchart LR
   A[Dispatch agent<br/>own Hedera key] -- GET /v1/conditions --> P
   P -- verify / settle --> FAC[Facilitator] --> H[(Hedera testnet)]
   API -- batched payout, 70% of revenue --> H
+  ARK -- public evidence --> CRE[Chainlink CRE DON<br/>recompute + consensus]
+  CRE -- attestation --> SEP[(Sepolia<br/>KneeDeepAttestations)]
+  SEP -- CRE ✓ / mismatch --> API
   H -- HBAR --> R
   API --- PG[(Postgres<br/>rate limits, queries, earnings)]
   M[Live map] -- free reads --> API
@@ -300,6 +303,20 @@ npm run docker:up      # Postgres + the app on http://localhost:8080 (staging ti
 Known gaps: no Content-Security-Policy yet (the map tiles and World ID bridge need a tested policy);
 rate limits are per process (use a shared store when running several replicas); no integration tests
 against a live Arkiv or Hedera node in CI.
+
+## Independent verification (Chainlink CRE)
+
+**Don't trust KneeDeep either.** A [Chainlink CRE workflow](cre/README.md) reads KneeDeep's raw
+evidence straight from Arkiv's public RPC (never through KneeDeep's server), recomputes every area
+with KneeDeep's own fusion engine on each node, reaches consensus, and writes the result to a
+contract on Sepolia. `GET /v1/verification` compares KneeDeep's answers with that attestation, and the
+map shows **CRE ✓** on every agent answer the network independently confirmed (or what it computed
+instead). Consensus proves what the public evidence says, not that the human reports are true.
+
+```bash
+npm run cre:test        # contract (Foundry) + workflow tests
+npm run cre:simulate    # recompute from live Arkiv data and log it
+```
 
 ## Deploy
 

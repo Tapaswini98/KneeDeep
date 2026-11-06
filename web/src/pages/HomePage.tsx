@@ -1,8 +1,10 @@
+import { CreBadge } from '../components/CreBadge';
 import { type Activity, api, formatHbar, type LiveReports } from '../lib/api';
 import { LEVELS, MUMBAI_CENTER } from '../lib/levels';
 import { placeName, timeAgo } from '../lib/places';
 import { navigate } from '../lib/router';
 import { usePolling } from '../lib/usePolling';
+import { useVerification } from '../lib/useVerification';
 
 /** What each level means for a vehicle; the dispatch agent routes on the same rules. */
 const ROUTING: Record<string, string> = {
@@ -49,6 +51,10 @@ const PILLARS = [
     name: 'Hedera',
     line: 'Agents pay per query in HBAR via x402, and reporters are paid back in batched transfers.',
   },
+  {
+    name: 'Chainlink CRE',
+    line: "Don't trust KneeDeep either: a Chainlink DON recomputes every area from the public evidence and attests it on Sepolia.",
+  },
 ];
 
 const levelInfo = (id: string | null) => LEVELS.find((l) => l.id === id);
@@ -61,6 +67,7 @@ export function HomePage() {
     20_000,
   );
   const a = activity.data;
+  const verification = useVerification();
   const share = a?.payouts.reporterSharePercent ?? 70;
   const price = a?.price ? formatHbar(a.price.amount) : '0.1 HBAR';
 
@@ -230,6 +237,7 @@ export function HomePage() {
                         <strong>
                           {info?.label ?? 'Contested'} · {placeName({ lat: q.lat, lng: q.lng })}
                         </strong>
+                        <CreBadge v={verification} cell={area.cell} level={area.level} />
                         <span className={`conf ${area.confidenceLabel}`}>
                           {area.confidence.toFixed(2)} {area.confidenceLabel}
                         </span>

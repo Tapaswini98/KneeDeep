@@ -9,6 +9,7 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
+import { CreBadge } from '../components/CreBadge';
 import { Earnings } from '../components/Earnings';
 import { SignInCard } from '../components/SignInCard';
 import { castVote, errorText, sessionVote, submitReport, voteBlocker, voterPosition } from '../lib/actions';
@@ -20,12 +21,14 @@ import {
   type LiveReport,
   type LiveReports,
   type PayoutBatch,
+  type Verification,
 } from '../lib/api';
 import { type Level, LEVELS, MUMBAI_CENTER } from '../lib/levels';
 import { useMyVotes } from '../lib/myVotes';
 import { navigate } from '../lib/router';
 import { useSession } from '../lib/session';
 import { useTestLocation } from '../lib/testLocation';
+import { useVerification } from '../lib/useVerification';
 import { usePolling } from '../lib/usePolling';
 
 const MAX_AGE_MIN = 180;
@@ -57,6 +60,7 @@ export function MapPage() {
   const [flyTo, setFlyTo] = useState<(Point & { zoom?: number }) | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const { location: here } = useTestLocation();
+  const verification = useVerification();
 
   // Picking a test location in the top bar flies the map there.
   useEffect(() => {
@@ -284,11 +288,18 @@ export function MapPage() {
           </p>
         </section>
 
+        {verification && <VerificationPanel v={verification} />}
+
         <section>
           <h3>Agent queries</h3>
           {queries.length === 0 && <p className="muted small">None yet. Run: npm run agent</p>}
           {queries.map((q) => (
-            <QueryCard key={q.id} q={q} onSelect={() => setFlyTo({ lat: q.lat, lng: q.lng })} />
+            <QueryCard
+              key={q.id}
+              q={q}
+              v={verification}
+              onSelect={() => setFlyTo({ lat: q.lat, lng: q.lng })}
+            />
           ))}
         </section>
       </aside>
@@ -461,7 +472,57 @@ function PayoutRow({ p }: { p: PayoutBatch }) {
   );
 }
 
-function QueryCard({ q, onSelect }: { q: AgentQuery; onSelect: () => void }) {
+type EnabledVerification = Extract<Verification, { enabled: true }>;
+
+/** Independent check: Chainlink CRE recomputed every area from public Arkiv evidence. */
+function VerificationPanel({ v }: { v: EnabledVerification }) {
+  const { areas, match, mismatch } = v.summary;
+  const differing = v.areas.filter((a) => a.status === 'mismatch');
+  return (
+    <section className="verify-panel">
+      <h3>Independent verification</h3>
+      <div className="verify-line">
+        <span className={`verify-score ${mismatch ? 'bad' : 'ok'}`}>
+          {match}/{areas}
+        </span>
+        <span>
+          areas match <strong>Chainlink CRE</strong>
+          <br />
+          <span className="muted">
+            attested {Math.round(v.ageMin)} min ago from {v.reports} reports, {v.votes} votes ·{' '}
+            <a href={v.contractUrl} target="_blank" rel="noreferrer">
+              Sepolia contract
+            </a>
+          </span>
+        </span>
+      </div>
+      {differing.length > 0 && (
+        <ul>
+          {differing.map((a) => (
+            <li key={a.cell}>
+              ⚠ {a.cell}: KneeDeep says {levelInfo(a.kneedeep?.level ?? null)?.label ?? 'contested'}, CRE
+              computed {levelInfo(a.attested.level)?.label ?? 'contested'}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="muted small">
+        A Chainlink DON reads the reports straight from Arkiv, not from KneeDeep, recomputes every area and
+        agrees on the result. It proves what the public evidence says, not that the reports are true.
+      </p>
+    </section>
+  );
+}
+
+function QueryCard({
+  q,
+  v,
+  onSelect,
+}: {
+  q: AgentQuery;
+  v: EnabledVerification | null;
+  onSelect: () => void;
+}) {
   const worst = q.summary[0];
   const info = levelInfo(worst?.level ?? null);
   return (
@@ -485,6 +546,7 @@ function QueryCard({ q, onSelect }: { q: AgentQuery; onSelect: () => void }) {
           <div className="query-answer">
             <span className="swatch" style={{ background: info?.color ?? '#999' }} />
             <strong>{info?.label ?? 'Contested'}</strong>
+            <CreBadge v={v} cell={worst.cell} level={worst.level} />
             <span className={`conf ${worst.confidenceLabel}`}>
               {worst.confidence.toFixed(2)} {worst.confidenceLabel}
             </span>

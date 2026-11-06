@@ -40,7 +40,11 @@
     "demo:seed": "npm run seed -w api",
     "demo:agent": "KNEEDEEP_API_URL=${KNEEDEEP_API_URL:-http://localhost:8080} npm run agent",
     "payout": "npm run payout -w api",
-    "deploy:check": "npm run preflight -w api --"
+    "deploy:check": "npm run preflight -w api --",
+    "cre:test": "cd cre/contracts && forge test && cd ../kneedeep-verify && bun test",
+    "cre:simulate": "cd cre && cre workflow simulate ./kneedeep-verify --target staging-settings --non-interactive --trigger-index 0",
+    "cre:simulate:broadcast": "cd cre && cre workflow simulate ./kneedeep-verify --target staging-settings --non-interactive --trigger-index 0 --broadcast",
+    "cre:deploy-contract": "./cre/contracts/deploy.sh"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

@@ -119,3 +119,23 @@ report of deep water is enough to avoid a route when there is an alternative, an
 is always printed next to the decision. Spending is bounded twice: per query (the client refuses
 to sign above `AGENT_MAX_TINYBARS_PER_QUERY`) and per trip (it prices the trip from the catalog
 before paying anything).
+
+## 9. Independent verification with Chainlink CRE
+
+Agents pay for KneeDeep's answers; nothing forces them to trust its server. The evidence is public
+on Arkiv and the fusion engine is pure and deterministic, so anyone can recompute an answer. The
+CRE workflow (`cre/kneedeep-verify`) makes that continuous and verifiable: every five minutes each
+node of a Chainlink DON reads the raw reports and votes from Arkiv's public JSON-RPC, runs the same
+fusion engine (imported from `api/src/fusion/fusion.ts`, made dependency-free for this), and the DON
+requires identical results before signing a report that the Forwarder delivers to
+`KneeDeepAttestations` on Sepolia. The API then recomputes its own answer for the attested areas
+through its own data path and reports match or mismatch per area; the dashboard shows it.
+
+Determinism comes from computing for the cron's scheduled time rather than each node's clock, and
+from canonical ordering of areas and evidence keys. Arkiv queries cannot be pinned to a block, so a
+write landing between two nodes' reads fails that round's consensus instead of producing a wrong
+attestation; the next round succeeds.
+
+Scope, stated plainly: consensus proves that independent nodes agree on what the public evidence
+says. It does not prove the human reports are true; that rests on World ID uniqueness,
+corroboration and paying only for corroborated reports.

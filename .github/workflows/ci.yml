@@ -21,6 +21,22 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  cre:
+    # Chainlink CRE: the attestation contract and the verification workflow's evidence logic.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge test
+        working-directory: cre/contracts
+      - run: bun install --frozen-lockfile
+        working-directory: cre/kneedeep-verify
+      - run: bun test && bunx tsc --noEmit
+        working-directory: cre/kneedeep-verify
+
   docker:
     runs-on: ubuntu-latest
     needs: check

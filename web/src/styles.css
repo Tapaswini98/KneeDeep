@@ -1868,3 +1868,60 @@ button.signin:hover {
 .signin-card p {
   margin: 0;
 }
+
+/* ------------------------------------------------------------------ Chainlink CRE verification */
+
+.cre-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  text-decoration: none;
+  background: #e8edff;
+  color: #2a4bd7;
+  border: 1px solid #c9d4ff;
+}
+
+.cre-badge:hover {
+  text-decoration: none;
+  background: #dbe3ff;
+}
+
+.cre-badge.differs {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-color: #f1dfa6;
+}
+
+.verify-panel .verify-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.verify-panel .verify-score {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.verify-panel .verify-score.ok {
+  color: #2a4bd7;
+}
+
+.verify-panel .verify-score.bad {
+  color: var(--warn);
+}
+
+.verify-panel ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 12px;
+}

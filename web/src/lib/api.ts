@@ -194,3 +194,29 @@ export interface MyActivity {
   reports: MyReport[];
   votes: MyVote[];
 }
+
+/** GET /v1/verification: the latest independent Chainlink CRE attestation, checked against KneeDeep. */
+export interface VerifiedArea {
+  cell: string;
+  attested: { level: string | null; confidence: number; supporters: number; reports: number };
+  kneedeep: { level: string | null; confidence: number } | null;
+  status: 'match' | 'mismatch' | 'not-served';
+}
+
+export type Verification =
+  | { enabled: false; reason: string }
+  | {
+      enabled: true;
+      contract: string;
+      contractUrl: string;
+      attestations: number;
+      asOf: string;
+      ageMin: number;
+      arkivBlock: string;
+      evidenceHash: string;
+      reports: number;
+      votes: number;
+      summary: { areas: number; match: number; mismatch: number; notServed: number };
+      areas: VerifiedArea[];
+      note: string;
+    };
