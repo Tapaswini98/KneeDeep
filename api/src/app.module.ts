@@ -15,6 +15,7 @@ import { IdentityModule } from './identity/identity.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { ReportsModule } from './reports/reports.module';
+import { VerificationModule } from './verification/verification.module';
 
 /** The built web app (npm run build -w web). When present, the API serves it: one origin, one deploy. */
 const WEB_DIST = join(__dirname, '..', '..', 'web', 'dist');
@@ -43,6 +44,7 @@ function webApp(): DynamicModule[] {
     PaymentsModule,
     PayoutsModule,
     ReportsModule,
+    VerificationModule,
     ...webApp(),
   ],
   controllers: [HealthController],

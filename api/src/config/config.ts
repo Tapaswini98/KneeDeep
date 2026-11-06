@@ -88,6 +88,15 @@ const objectSchema = z.object({
   // differ, so one person could hold two pseudonyms; keep false unless verification fails without it.
   WORLD_ALLOW_LEGACY_PROOFS: bool('false'),
   REPORTER_SESSION_HOURS: z.coerce.number().positive().default(12),
+
+  // Independent verification: the Chainlink CRE workflow (cre/kneedeep-verify) attests its own
+  // recomputation of every area to this contract. Empty = verification not shown.
+  CRE_ATTESTATIONS_ADDRESS: z
+    .string()
+    .regex(/^(0x[0-9a-fA-F]{40})?$/, 'CRE_ATTESTATIONS_ADDRESS must be a 0x address')
+    .default(''),
+  CRE_CHAIN_RPC_URL: z.string().url().default('https://ethereum-sepolia-rpc.publicnode.com'),
+  CRE_EXPLORER_URL: z.string().url().default('https://sepolia.etherscan.io'),
 });
 
 const schema = objectSchema.transform((c) => ({
