@@ -21,6 +21,10 @@ const schema = z.object({
   ARKIV_ACCESS_KEY: z.string().default(''),
   ARKIV_PRIVATE_KEY: optional,
   REPORT_TTL_SECONDS: z.coerce.number().int().positive().default(3 * 60 * 60),
+  // 'world' = World ID proof required (reports are live). 'dev' = no proof, every report is labelled simulated.
+  REPORTER_VERIFIER: z.enum(['world', 'dev']).default('world'),
+  REPORT_RATE_LIMIT_MINUTES: z.coerce.number().int().positive().default(30),
+  VOTE_MAX_DISTANCE_M: z.coerce.number().int().positive().default(1_000),
 
   HEDERA_NETWORK: z.enum(['hedera:testnet', 'hedera:mainnet']).default('hedera:testnet'),
   HEDERA_ACCOUNT_ID: optional,

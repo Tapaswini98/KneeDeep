@@ -15,19 +15,26 @@ export interface Catalog {
   }[];
 }
 
+export type Level = 'dry' | 'ankle' | 'knee' | 'waist' | 'closed';
+
 export interface Area {
   cell: string;
   center: { lat: number; lng: number };
-  level: string;
+  distanceM: number;
+  /** Null when contested: treat as unknown, not as safe. */
+  level: Level | null;
   confidence: number;
+  confidenceLabel: 'high' | 'medium' | 'low';
   explanation: string;
+  inputs: { supportingHumans: number; newestAgeMin: number; disputes: number };
+  source: 'live' | 'simulated' | 'mixed';
 }
 
 export interface ConditionsAnswer {
   queryId: string;
   generatedAt: string;
-  dataStatus: 'stub' | 'live' | 'simulated' | 'mixed' | 'empty';
-  notice?: string;
+  dataStatus: 'live' | 'simulated' | 'mixed' | 'empty';
+  notices: string[];
   areas: Area[];
 }
 

@@ -1,21 +1,22 @@
 import { BadRequestException, Controller, Get, Query, Res, ServiceUnavailableException } from '@nestjs/common';
 import type { Response } from 'express';
-import { prefixesCovering } from '../geo/geo';
 import { QUERY_ID_HEADER } from '../payments/paywall';
 import { PaymentsService } from '../payments/payments.service';
 import { QueriesRepository } from '../queries/queries.repository';
 import { conditionsQuerySchema } from './conditions.query';
+import { ConditionsService } from './conditions.service';
 
 /**
  * GET /v1/conditions?lat&lng&radius  (paid, x402)
  *
  * By the time this runs the x402 middleware has verified the payment; it settles
- * after we respond. A 4xx here cancels settlement, so invalid queries are free.
+ * after we respond. A 4xx/5xx here cancels settlement, so failed queries are free.
  */
 @Controller('v1/conditions')
 export class ConditionsController {
   constructor(
     private readonly payments: PaymentsService,
+    private readonly conditions: ConditionsService,
     private readonly queries: QueriesRepository,
   ) {}
 
@@ -26,28 +27,18 @@ export class ConditionsController {
     const parsed = conditionsQuerySchema.safeParse(raw);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map((i) => i.message));
     const { lat, lng, radius } = parsed.data;
-    const cells = prefixesCovering(lat, lng, radius);
 
-    // S2 stub: the paid pipeline is real, the data is not yet. S3 replaces this with
-    // Arkiv reads + the fusion engine. Labelled so it can never pass as live data.
-    const dataStatus = 'stub' as const;
+    const result = await this.conditions.answer(lat, lng, radius);
     const queryId = await this.queries.create({
       lat,
       lng,
       radiusM: radius,
-      cells,
+      cells: result.cells,
       amountTinybars: BigInt(this.payments.quote!.amount),
-      dataStatus,
+      dataStatus: result.dataStatus,
+      used: result.used,
     });
     res.setHeader(QUERY_ID_HEADER, queryId);
-
-    return {
-      queryId,
-      query: { lat, lng, radiusM: radius, searchedPrefixes: cells },
-      generatedAt: new Date().toISOString(),
-      dataStatus,
-      notice: 'STUB ANSWER: no real observations yet. Do not route on this.',
-      areas: [],
-    };
+    return { queryId, ...result.body };
   }
 }

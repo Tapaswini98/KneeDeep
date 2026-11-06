@@ -22,6 +22,34 @@ Built at ETHGlobal Mumbai 2026 for **Hedera** (AI Agents That Pay: x402), **Arki
    Hedera, and receives a level per area with a confidence score and the reasons behind it.
 4. **Earn.** Reporters whose corroborated reports were used in paid answers are paid in one batched Hedera transfer.
 
+## API
+
+| Endpoint | Cost | What |
+|----------|------|------|
+| `GET /v1` | free | Catalog: what is for sale and the price |
+| `GET /v1/conditions?lat&lng&radius` | **x402**, 0.1 HBAR | Fused level per ~150 m cell, confidence, and the inputs behind it |
+| `GET /v1/reports?lat&lng&radius` | free | Raw live reports (the same data anyone can read on Arkiv) |
+| `POST /v1/reports` | free | Submit a report: `{ level, lat, lng, proof }` (proof of human required) |
+| `POST /v1/reports/:key/votes` | free | Confirm or dispute: `{ vote, lat, lng, proof }`; you must be within 1 km |
+| `GET /health` | free | Postgres, Arkiv and Hedera status |
+
+Example paid answer (simulated data):
+
+```json
+{
+  "dataStatus": "simulated",
+  "notices": ["Includes SIMULATED demo data, not real observations."],
+  "areas": [{
+    "cell": "te7uc8t", "distanceM": 54,
+    "level": "knee", "confidence": 0.78, "confidenceLabel": "high",
+    "explanation": "4 independent humans report knee-deep water; newest just now, oldest 1 min ago; 2 confirmations, 1 dispute.",
+    "inputs": { "supportingHumans": 4, "reports": 3, "contradictingReports": 0, "confirmations": 2, "disputes": 1, "newestAgeMin": 0.9, "oldestAgeMin": 1.3 }
+  }]
+}
+```
+
+How confidence is computed: [docs/design.md](docs/design.md).
+
 ## Payment flow (x402 on Hedera)
 
 ```

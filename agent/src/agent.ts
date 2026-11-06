@@ -31,8 +31,11 @@ async function main() {
   const started = Date.now();
   const { answer, payment } = await client.conditions(waypoint.lat, waypoint.lng, 300);
   console.log(`Answer in ${((Date.now() - started) / 1000).toFixed(1)}s, data: ${answer.dataStatus}`);
-  if (answer.notice) console.log(`  ${answer.notice}`);
-  console.log(`  ${answer.areas.length} area(s)`);
+  for (const n of answer.notices ?? []) console.log(`  NOTE: ${n}`);
+  for (const a of answer.areas) {
+    console.log(`  ${a.cell} (${a.distanceM} m): ${a.level ?? 'CONTESTED'}, confidence ${a.confidence} [${a.confidenceLabel}]`);
+    console.log(`    ${a.explanation}`);
+  }
 
   if (!payment) throw new Error('Got an answer but no settled payment (missing PAYMENT-RESPONSE)');
   console.log(`\nPaid by ${payment.payer}, tx ${payment.txId}`);

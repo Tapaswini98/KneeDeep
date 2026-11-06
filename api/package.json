@@ -12,7 +12,8 @@
     "db:reset": "tsx scripts/migrate.ts --reset",
     "arkiv:wallet": "tsx scripts/arkiv-wallet.ts",
     "arkiv:smoke": "tsx scripts/arkiv-smoke.ts",
-    "hedera:balance": "tsx scripts/hedera-balance.ts"
+    "hedera:balance": "tsx scripts/hedera-balance.ts",
+    "simulate": "tsx scripts/simulate.ts"
   },
   "dependencies": {
     "@arkiv-network/sdk": "1.0.1",
