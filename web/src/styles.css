@@ -225,3 +225,63 @@ button:disabled {
   background: #fbe6e4;
   color: var(--error);
 }
+
+.verify {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session {
+  margin: 0;
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.nearby h3 {
+  font-size: 15px;
+  margin: 12px 0 6px;
+}
+
+.nearby-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+}
+
+.nearby-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.nearby-text small {
+  display: block;
+  color: var(--muted);
+}
+
+.nearby-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.nearby-actions button {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #c9d3dc;
+  background: var(--surface);
+  cursor: pointer;
+}

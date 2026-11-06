@@ -1,15 +1,10 @@
-import { Global, Logger, Module, NotImplementedException } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DevVerifier } from './dev.verifier';
 import { HUMAN_VERIFIER, HumanVerifier } from './human-verifier';
-
-/** Fails closed: until World ID verification is wired (S4), 'world' mode accepts nobody. */
-class WorldIdNotWiredVerifier implements HumanVerifier {
-  readonly name = 'world' as const;
-  async verify(): Promise<never> {
-    throw new NotImplementedException('World ID verification is not wired yet');
-  }
-}
+import { IdentityController } from './identity.controller';
+import { SessionsService } from './sessions.service';
+import { WorldIdVerifier } from './world-id.verifier';
 
 @Global()
 @Module({
@@ -18,14 +13,23 @@ class WorldIdNotWiredVerifier implements HumanVerifier {
       provide: HUMAN_VERIFIER,
       inject: [APP_CONFIG],
       useFactory: (config: AppConfig): HumanVerifier => {
+        const log = new Logger('Identity');
         if (config.REPORTER_VERIFIER === 'dev') {
-          new Logger('Identity').warn('REPORTER_VERIFIER=dev: no proof of human; all reports are SIMULATED');
+          log.warn('REPORTER_VERIFIER=dev: no proof of human; all reports are SIMULATED');
           return new DevVerifier();
         }
-        return new WorldIdNotWiredVerifier();
+        log.log(`World ID verification (${config.WORLD_ENVIRONMENT}, action "${config.WORLD_ACTION}")`);
+        return new WorldIdVerifier({
+          rpId: config.WORLD_RP_ID,
+          action: config.WORLD_ACTION,
+          environment: config.WORLD_ENVIRONMENT,
+          baseUrl: config.WORLD_VERIFY_BASE_URL,
+        });
       },
     },
+    SessionsService,
   ],
-  exports: [HUMAN_VERIFIER],
+  controllers: [IdentityController],
+  exports: [HUMAN_VERIFIER, SessionsService],
 })
 export class IdentityModule {}

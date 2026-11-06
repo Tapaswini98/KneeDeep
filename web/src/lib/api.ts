@@ -10,13 +10,23 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+export async function api<T>(path: string, init?: RequestInit & { token?: string }): Promise<T> {
+  const { token, ...rest } = init ?? {};
   const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    ...rest,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...rest.headers,
+    },
   });
   const text = await res.text();
-  const body = text ? (JSON.parse(text) as unknown) : undefined;
+  let body: unknown;
+  try {
+    body = text ? JSON.parse(text) : undefined;
+  } catch {
+    body = undefined;
+  }
   if (!res.ok) {
     const message =
       (body as { message?: string | string[] } | undefined)?.message ?? `${res.status} ${res.statusText}`;
@@ -30,4 +40,16 @@ export interface Health {
   postgres: { ok: boolean };
   arkiv: { ok: boolean; detail?: string };
   hedera: { ok: boolean; detail?: string };
+}
+
+export interface LiveReport {
+  key: string;
+  level: string;
+  cell: string;
+  center: { lat: number; lng: number };
+  source: 'live' | 'simulated';
+  reportedAt: string;
+  ageMin: number;
+  confirmations: number;
+  disputes: number;
 }

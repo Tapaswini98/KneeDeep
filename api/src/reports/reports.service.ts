@@ -7,7 +7,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { arkivExplorerTx } from '../arkiv/client';
 import { ArkivStore, LiveReport } from '../arkiv/arkiv.store';
@@ -15,7 +14,7 @@ import { Level, Source, Vote } from '../arkiv/schemas';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DEFAULT_MAX_AGE_MIN } from '../fusion/fusion';
 import { cellCenter, distanceMeters, prefixesCovering, toCell } from '../geo/geo';
-import { HUMAN_VERIFIER, HumanVerifier, pseudonymFor, VerifiedHuman } from '../identity/human-verifier';
+import type { Reporter } from '../identity/sessions.service';
 import { ReportsRepository } from './reports.repository';
 
 /** Half the diagonal of a precision-7 geohash cell: a cell counts as "within r" if any of it might be. */
@@ -27,28 +26,20 @@ export class ReportsService {
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
-    @Inject(HUMAN_VERIFIER) private readonly verifier: HumanVerifier,
     private readonly store: ArkivStore,
     private readonly repo: ReportsRepository,
   ) {}
 
-  private pseudonym(human: VerifiedHuman): string {
-    const salt = this.config.PSEUDONYM_SALT;
-    if (!salt) throw new ServiceUnavailableException('PSEUDONYM_SALT is not set');
-    return pseudonymFor(salt, human.nullifier);
+  /** Only World ID-verified humans produce live data. Everything else is labelled simulated, always. */
+  private sourceFor(who: Reporter): Source {
+    return who.method === 'world' ? 'live' : 'simulated';
   }
 
-  /** Only proof-of-human submissions are live. Everything else is labelled simulated, always. */
-  private sourceFor(human: VerifiedHuman): Source {
-    return human.method === 'world' ? 'live' : 'simulated';
-  }
-
-  async submit(input: { level: Level; lat: number; lng: number; proof?: unknown }) {
+  async submit(input: { level: Level; lat: number; lng: number }, who: Reporter) {
     // Coarsen first: the raw coordinates go no further than this line.
     const cell = toCell(input.lat, input.lng);
-    const human = await this.verifier.verify(input.proof, { purpose: 'report', signal: `report:${input.level}:${cell}` });
-    const reporter = this.pseudonym(human);
-    const source = this.sourceFor(human);
+    const reporter = who.pseudonym;
+    const source = this.sourceFor(who);
     const reportedAt = new Date(Math.floor(Date.now() / 1000) * 1000);
 
     await this.repo.upsertReporter(reporter);
@@ -102,12 +93,11 @@ export class ReportsService {
     }
   }
 
-  async vote(reportKey: string, input: { vote: Vote; lat: number; lng: number; proof?: unknown }) {
+  async vote(reportKey: string, input: { vote: Vote; lat: number; lng: number }, who: Reporter) {
     const report = await this.store.getReport(reportKey);
     if (!report) throw new NotFoundException('No live report with that key (it may have expired)');
 
-    const human = await this.verifier.verify(input.proof, { purpose: 'vote', signal: `vote:${reportKey}:${input.vote}` });
-    const voter = this.pseudonym(human);
+    const voter = who.pseudonym;
     if (voter === report.reporter) throw new ForbiddenException('You cannot vote on your own report');
 
     const distance = distanceMeters({ lat: input.lat, lng: input.lng }, cellCenter(report.cell));
@@ -123,7 +113,7 @@ export class ReportsService {
 
     try {
       const votedAt = Math.floor(Date.now() / 1000);
-      const source = this.sourceFor(human);
+      const source = this.sourceFor(who);
       const written = await this.store.writeVote({
         report: reportKey,
         reportExpiresAtBlock: report.expiresAtBlock,

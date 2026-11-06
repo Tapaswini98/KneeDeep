@@ -1,26 +1,25 @@
 import { createHash } from 'node:crypto';
 
 export interface VerifiedHuman {
-  /** Stable per human (and per World ID action). Never stored or published; only its salted hash is. */
+  /** Stable per human for our World ID action. Never stored or published; only its salted hash is. */
   nullifier: string;
-  /** 'world' proofs make reports live; 'dev' reports are always labelled simulated. */
+  /** 'world' makes a reporter's submissions live; 'dev' submissions are always labelled simulated. */
   method: 'world' | 'dev';
-}
-
-export interface VerifyContext {
-  /** What the proof authorises, e.g. "report" or "vote". */
-  purpose: 'report' | 'vote';
-  /** Binds the proof to this exact submission so it cannot be replayed for another. */
-  signal: string;
 }
 
 export interface HumanVerifier {
   readonly name: 'world' | 'dev';
   /** Throws UnauthorizedException when the proof is missing or invalid. */
-  verify(proof: unknown, ctx: VerifyContext): Promise<VerifiedHuman>;
+  verify(proof: unknown): Promise<VerifiedHuman>;
 }
 
 export const HUMAN_VERIFIER = Symbol('HUMAN_VERIFIER');
+
+/**
+ * The signal every KneeDeep proof must carry. World ID binds it into the proof, and we
+ * check its hash on the server, so a proof made for another app context is rejected.
+ */
+export const WORLD_SIGNAL = 'kneedeep:reporter-session';
 
 /** Public reporter id: sha256(salt ":" nullifier), hex. Unlinkable to the nullifier without the salt. */
 export function pseudonymFor(salt: string, nullifier: string): string {

@@ -38,6 +38,10 @@ const schema = z.object({
   WORLD_RP_ID: optional,
   WORLD_RP_SIGNING_KEY: optional,
   WORLD_ACTION: z.string().default('submit-report'),
+  // 'staging' only for testing with the World ID simulator (https://simulator.worldcoin.org).
+  WORLD_ENVIRONMENT: z.enum(['production', 'staging']).default('production'),
+  WORLD_VERIFY_BASE_URL: z.string().url().default('https://developer.world.org'),
+  REPORTER_SESSION_HOURS: z.coerce.number().positive().default(12),
 });
 
 export type AppConfig = z.infer<typeof schema>;

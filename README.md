@@ -29,8 +29,10 @@ Built at ETHGlobal Mumbai 2026 for **Hedera** (AI Agents That Pay: x402), **Arki
 | `GET /v1` | free | Catalog: what is for sale and the price |
 | `GET /v1/conditions?lat&lng&radius` | **x402**, 0.1 HBAR | Fused level per ~150 m cell, confidence, and the inputs behind it |
 | `GET /v1/reports?lat&lng&radius` | free | Raw live reports (the same data anyone can read on Arkiv) |
-| `POST /v1/reports` | free | Submit a report: `{ level, lat, lng, proof }` (proof of human required) |
-| `POST /v1/reports/:key/votes` | free | Confirm or dispute: `{ vote, lat, lng, proof }`; you must be within 1 km |
+| `GET /v1/identity/context` | free | Signed IDKit request context (the RP signing key stays on the server) |
+| `POST /v1/identity/session` | free | Exchange a World ID Proof of Human for a reporter session: `{ proof }` |
+| `POST /v1/reports` | free | Submit a report: `{ level, lat, lng }` with `Authorization: Bearer <session>` |
+| `POST /v1/reports/:key/votes` | free | Confirm or dispute: `{ vote, lat, lng }` with a session; you must be within 1 km |
 | `GET /health` | free | Postgres, Arkiv and Hedera status |
 
 Example paid answer (simulated data):
