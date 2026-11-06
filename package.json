@@ -56,5 +56,12 @@
     "prettier": "3.9.10",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.0"
+  },
+  "overrides": {
+    "multer": "2.5.0",
+    "ws@>=8.0.0 <8.21.0": "8.22.1",
+    "shell-quote": "1.12.0",
+    "glob@>=9.0.0 <14.0.2": "14.0.4",
+    "minimatch@>=7.0.0 <11.0.1": "11.0.5"
   }
 }
