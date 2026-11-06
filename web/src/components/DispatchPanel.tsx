@@ -26,11 +26,22 @@ export function DispatchPanel({
   trips,
   selected,
   onSelect,
+  unavailable = false,
 }: {
   trips: Trip[];
   selected: Trip | null;
   onSelect: (t: Trip) => void;
+  /** The API could not be reached: say so rather than "no dispatches". */
+  unavailable?: boolean;
 }) {
+  if (!selected && unavailable) {
+    return (
+      <section className="dispatch">
+        <h3>Latest dispatch</h3>
+        <p className="muted small">Dispatches are unavailable right now; retrying.</p>
+      </section>
+    );
+  }
   if (!selected) {
     return (
       <section className="dispatch">

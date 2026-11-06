@@ -227,7 +227,12 @@ export function MapPage() {
           <p className="banner">Includes SIMULATED demo data (dashed markers).</p>
         )}
 
-        <DispatchPanel trips={listed} selected={selectedTrip} onSelect={selectTrip} />
+        <DispatchPanel
+          trips={listed}
+          selected={selectedTrip}
+          onSelect={selectTrip}
+          unavailable={!trips.data && !!trips.error}
+        />
 
         <section>
           <h3>You</h3>
@@ -266,7 +271,7 @@ export function MapPage() {
           <h3>Live now</h3>
           <div className="stats">
             <div>
-              <strong>{all.length}</strong>
+              <strong>{reports.data ? all.length : '–'}</strong>
               <span>live reports</span>
             </div>
             <div>
@@ -291,7 +296,10 @@ export function MapPage() {
             {reports.updatedAt && ` · ${reports.updatedAt.toLocaleTimeString()}`}
           </p>
           {(reports.error || activity.error) && (
-            <p className="notice error small">{reports.error ?? activity.error}</p>
+            <p className="notice error small">
+              Live data is unavailable right now ({reports.error ?? activity.error}). The map keeps retrying
+              every 10 seconds; what you see may be out of date.
+            </p>
           )}
         </section>
 

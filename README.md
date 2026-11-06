@@ -2,6 +2,10 @@
 
 **Street-level truth for AI agents: verified, perishable, paid.**
 
+**Live:** [kneedeep.onrender.com](https://kneedeep.onrender.com) (testnets, World ID simulator) ·
+**Video:** _add the link after recording_ ·
+**Independent verification:** [Chainlink CRE attestations on Sepolia](cre/README.md#live-on-sepolia)
+
 Weather APIs tell an agent it rained. KneeDeep tells it the Andheri subway is knee-deep _right now_,
 from three verified humans 20 minutes ago, and pays those humans for it.
 
@@ -9,7 +13,8 @@ KneeDeep is a paid, real-time API of street-level conditions (waterlogging, bloc
 verified humans. Reports expire because street truth expires. Delivery, logistics and dispatch agents
 pay per query via x402 on Hedera, and the reporters whose corroborated reports were used get paid.
 
-Built at ETHGlobal Mumbai 2026 for **Hedera** (AI Agents That Pay: x402), **Arkiv** and **World**.
+Built at ETHGlobal Mumbai 2026 for **Hedera** (AI Agents That Pay: x402), **Arkiv** and **Chainlink CRE**,
+with **World ID** proving every reporter is a unique human.
 
 > Demo data is simulated and labelled `source: simulated` everywhere: on Arkiv, in API answers and on
 > the map (dashed markers). Only World ID-verified reports are ever `live`.
