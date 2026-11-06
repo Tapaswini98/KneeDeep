@@ -56,6 +56,10 @@ services:
         value: https://api.testnet.blocky402.com
       - key: PAYOUT_INTERVAL_MINUTES
         value: '60'
+      # The dispatch agent sends this to record its trips on the map. Generated once: copy it from
+      # the dashboard into the agent's AGENT_API_TOKEN.
+      - key: AGENT_API_TOKEN
+        generateValue: true
       # Chainlink CRE attestations contract (cre/README.md); leave empty until deployed.
       - key: CRE_ATTESTATIONS_ADDRESS
         sync: false

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import ngeohash from 'ngeohash';
 import {
   Circle,
   CircleMarker,
@@ -9,9 +10,12 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
+import { type BBox, CoverageLayer, CoverageLegend, ViewportWatcher } from '../components/CoverageLayer';
 import { CreBadge } from '../components/CreBadge';
+import { DispatchPanel } from '../components/DispatchPanel';
 import { Earnings } from '../components/Earnings';
 import { SignInCard } from '../components/SignInCard';
+import { TripLayer } from '../components/TripLayer';
 import { castVote, errorText, sessionVote, submitReport, voteBlocker, voterPosition } from '../lib/actions';
 import {
   type Activity,
@@ -21,13 +25,17 @@ import {
   type LiveReport,
   type LiveReports,
   type PayoutBatch,
+  type Trip,
+  type Trips,
   type Verification,
 } from '../lib/api';
 import { type Level, LEVELS, MUMBAI_CENTER } from '../lib/levels';
 import { useMyVotes } from '../lib/myVotes';
+import { PASSABILITY } from '../lib/passability';
 import { navigate } from '../lib/router';
 import { useSession } from '../lib/session';
 import { useTestLocation } from '../lib/testLocation';
+import { useCoverage } from '../lib/useCoverage';
 import { useVerification } from '../lib/useVerification';
 import { usePolling } from '../lib/usePolling';
 
@@ -54,13 +62,58 @@ export function MapPage() {
     10_000,
   );
   const activity = usePolling(() => api<Activity>('/v1/activity?limit=15'), 10_000);
+  const trips = usePolling(() => api<Trips>('/v1/trips?limit=10'), 10_000);
 
-  const [layers, setLayers] = useState({ live: true, simulated: true, queries: true });
+  const [layers, setLayers] = useState({
+    live: true,
+    simulated: true,
+    queries: true,
+    dispatch: true,
+    coverage: false,
+  });
   const [draft, setDraft] = useState<Point | null>(null);
   const [flyTo, setFlyTo] = useState<(Point & { zoom?: number }) | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const { location: here } = useTestLocation();
   const verification = useVerification();
+
+  // Coverage is fetched for the visible area only, while the layer is on.
+  const [bbox, setBbox] = useState<BBox | null>(null);
+  const coverage = useCoverage(layers.coverage, bbox);
+  const covered = useMemo(() => new Set(coverage.data?.cells.map((c) => c.cell)), [coverage.data]);
+
+  // The dispatch shown: the latest by default, or one picked from the list or linked with ?trip=<id>.
+  const linkedId = useRef(new URLSearchParams(window.location.search).get('trip'));
+  const [tripId, setTripId] = useState<string | null>(linkedId.current);
+  const [linkedTrip, setLinkedTrip] = useState<Trip | null>(null);
+  const [fitKey, setFitKey] = useState(0);
+  const listed = useMemo(() => trips.data?.trips ?? [], [trips.data]);
+  const selectedTrip = tripId
+    ? (listed.find((t) => t.id === tripId) ?? (linkedTrip?.id === tripId ? linkedTrip : null))
+    : (listed[0] ?? null);
+
+  useEffect(() => {
+    // A linked trip older than the latest ten: fetch it on its own.
+    if (!tripId || !trips.data || listed.some((t) => t.id === tripId) || linkedTrip?.id === tripId) return;
+    api<Trip>(`/v1/trips/${tripId}`).then(setLinkedTrip, () => setTripId(null));
+  }, [tripId, trips.data, listed, linkedTrip]);
+
+  useEffect(() => {
+    // Opened from a link (the agent prints one): fit the map to that trip once it has loaded.
+    if (linkedId.current && selectedTrip?.id === linkedId.current) {
+      linkedId.current = null;
+      setFitKey((k) => k + 1);
+    }
+  }, [selectedTrip]);
+
+  const selectTrip = (t: Trip) => {
+    // Picking the newest one keeps following new dispatches; any other one stays pinned.
+    const pinned = t.id === listed[0]?.id ? null : t.id;
+    setTripId(pinned);
+    setFitKey((k) => k + 1);
+    setLayers((l) => ({ ...l, dispatch: true }));
+    window.history.replaceState(null, '', pinned ? `/map?trip=${pinned}` : '/map');
+  };
 
   // Picking a test location in the top bar flies the map there.
   useEffect(() => {
@@ -84,6 +137,12 @@ export function MapPage() {
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ClickToReport onClick={setDraft} />
+        <ViewportWatcher onChange={setBbox} />
+        {layers.coverage && coverage.data && (
+          // Below ~zoom 16 (a view over ~2.5 km tall) a 150 m cell is too small to see as a square.
+          <CoverageLayer cells={coverage.data.cells} zoomedOut={!!bbox && bbox[2] - bbox[0] > 0.025} />
+        )}
+        {layers.dispatch && selectedTrip && <TripLayer trip={selectedTrip} fitKey={fitKey} />}
         {here && (
           <>
             <Circle
@@ -151,6 +210,9 @@ export function MapPage() {
           <Popup position={[draft.lat, draft.lng]} eventHandlers={{ remove: () => setDraft(null) }}>
             <DraftPopup
               at={draft}
+              noData={
+                layers.coverage && !!coverage.data && !covered.has(ngeohash.encode(draft.lat, draft.lng, 7))
+              }
               onDone={(n) => {
                 setDraft(null);
                 afterAction(n);
@@ -164,6 +226,8 @@ export function MapPage() {
         {all.some((r) => r.source === 'simulated') && (
           <p className="banner">Includes SIMULATED demo data (dashed markers).</p>
         )}
+
+        <DispatchPanel trips={listed} selected={selectedTrip} onSelect={selectTrip} />
 
         <section>
           <h3>You</h3>
@@ -239,6 +303,8 @@ export function MapPage() {
                 ['live', 'Live (verified)'],
                 ['simulated', 'Simulated'],
                 ['queries', 'Agent queries'],
+                ['dispatch', 'Dispatch routes'],
+                ['coverage', 'Coverage'],
               ] as const
             ).map(([k, label]) => (
               <label key={k}>
@@ -260,6 +326,29 @@ export function MapPage() {
             ))}
           </ul>
           <p className="muted small">Markers fade with age and disappear when the report expires on Arkiv.</p>
+          {layers.dispatch && (
+            <>
+              <ul className="legend-list">
+                <li>
+                  <span className="line-swatch chosen" />
+                  Chosen route
+                </li>
+                <li>
+                  <span className="line-swatch rejected" />
+                  Rejected
+                </li>
+                {(['safe', 'risky', 'blocked', 'unknown'] as const).map((p) => (
+                  <li key={p} title={PASSABILITY[p].hint}>
+                    <span className="swatch" style={{ background: PASSABILITY[p].color }} />
+                    {PASSABILITY[p].label}
+                  </li>
+                ))}
+              </ul>
+              <p className="muted small">Checkpoint dots: passability for a two-wheeler.</p>
+            </>
+          )}
+          {layers.coverage && <CoverageLegend truncated={!!coverage.data?.truncated} />}
+          {layers.coverage && coverage.error && <p className="notice error small">{coverage.error}</p>}
         </section>
 
         <section>
@@ -402,22 +491,33 @@ function ReportPopup({ report: r, onDone }: { report: LiveReport; onDone: (n: No
   );
 }
 
-function DraftPopup({ at, onDone }: { at: Point; onDone: (n: Notice) => void }) {
+function DraftPopup({ at, noData, onDone }: { at: Point; noData: boolean; onDone: (n: Notice) => void }) {
   const { session } = useSession();
   const [busy, setBusy] = useState<Level | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const note = noData && <p className="nodata-note">No data here: unknown, not dry.</p>;
 
-  if (!session) return <p className="small">Verify in the side panel first, then click the map to report.</p>;
+  if (!session) {
+    return (
+      <div className="popup">
+        {note}
+        <p className="small">Verify in the side panel first, then click the map to report.</p>
+      </div>
+    );
+  }
   if (session.method === 'world') {
     // A verified human's report must come from where they actually are.
     return (
-      <p className="small">
-        Live reports come from where you stand: open{' '}
-        <button className="link" onClick={() => navigate('/report')}>
-          Report
-        </button>{' '}
-        at the spot (while testing, pick a test location in the top bar).
-      </p>
+      <div className="popup">
+        {note}
+        <p className="small">
+          Live reports come from where you stand: open{' '}
+          <button className="link" onClick={() => navigate('/report')}>
+            Report
+          </button>{' '}
+          at the spot (while testing, pick a test location in the top bar).
+        </p>
+      </div>
     );
   }
 
@@ -435,6 +535,7 @@ function DraftPopup({ at, onDone }: { at: Point; onDone: (n: Notice) => void }) 
 
   return (
     <div className="popup">
+      {note}
       <strong>Report here (simulated)</strong>
       <div className="popup-levels">
         {LEVELS.map((l) => (
@@ -546,6 +647,11 @@ function QueryCard({
           <div className="query-answer">
             <span className="swatch" style={{ background: info?.color ?? '#999' }} />
             <strong>{info?.label ?? 'Contested'}</strong>
+            {worst.passability && (
+              <span className={`pass-pill ${worst.passability}`} title={worst.passabilityReason}>
+                {PASSABILITY[worst.passability].label}
+              </span>
+            )}
             <CreBadge v={v} cell={worst.cell} level={worst.level} />
             <span className={`conf ${worst.confidenceLabel}`}>
               {worst.confidence.toFixed(2)} {worst.confidenceLabel}

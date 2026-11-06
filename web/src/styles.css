@@ -1925,3 +1925,177 @@ button.signin:hover {
   padding: 0;
   font-size: 12px;
 }
+
+/* ------------------------------------------------------------------ dispatch decisions */
+
+/* Passability: always a text label next to the colour. */
+.pass-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.pass-pill.safe {
+  background: #1d8a4b;
+}
+
+.pass-pill.risky {
+  background: #b97300;
+}
+
+.pass-pill.blocked {
+  background: var(--error);
+}
+
+.pass-pill.unknown {
+  background: #6b7785;
+}
+
+.panel section.dispatch {
+  border-top: none;
+}
+
+.dispatch-trip {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dispatch-outcome {
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dispatch-outcome.dispatched {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.dispatch-outcome.held {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.dispatch-routes {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.dispatch-routes li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.route-pill {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+}
+
+.route-pill.chosen {
+  color: var(--ok);
+}
+
+.route-pill.rejected {
+  color: var(--error);
+  border-style: dashed;
+}
+
+.route-pill.passed_over {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.dispatch-detail ul {
+  list-style: none;
+  margin: 4px 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+h3.dispatch-more {
+  margin-top: 14px;
+}
+
+.dispatch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dispatch-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  text-align: left;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot.dispatched {
+  background: var(--ok);
+}
+
+.dot.held {
+  background: var(--error);
+}
+
+/* Legend swatches for route lines and coverage squares. */
+.line-swatch {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  border-top: 4px solid #1d8a4b;
+  flex-shrink: 0;
+}
+
+.line-swatch.rejected {
+  border-top: 3px dashed var(--error);
+}
+
+.swatch.square {
+  border-radius: 2px;
+}
+
+.swatch.outline {
+  background: transparent;
+  border: 1.5px dashed #8a96a3;
+}
+
+.nodata-note {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.leaflet-tooltip.trip-end {
+  font-weight: 600;
+  font-size: 12px;
+}

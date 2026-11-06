@@ -62,3 +62,29 @@ export function prefixesCovering(lat: number, lng: number, radiusM: number): str
   const center = ngeohash.encode(lat, lng, precision);
   return [center, ...ngeohash.neighbors(center)];
 }
+
+export type BBox = [minLat: number, minLng: number, maxLat: number, maxLng: number];
+
+/** The bbox clipped to Mumbai, or null if they do not overlap. */
+export function clipToMumbai([minLat, minLng, maxLat, maxLng]: BBox): BBox | null {
+  const b = MUMBAI_BOUNDS;
+  const clipped: BBox = [
+    Math.max(minLat, b.minLat),
+    Math.max(minLng, b.minLng),
+    Math.min(maxLat, b.maxLat),
+    Math.min(maxLng, b.maxLng),
+  ];
+  return clipped[0] < clipped[2] && clipped[1] < clipped[3] ? clipped : null;
+}
+
+/**
+ * Geohash prefixes covering a bbox, as fine as possible within `maxPrefixes` (one Arkiv
+ * `startsWith(cell, prefix)` clause each). All of Mumbai is 12 precision-4 prefixes.
+ */
+export function prefixesForBbox([minLat, minLng, maxLat, maxLng]: BBox, maxPrefixes = 16): string[] {
+  for (const precision of [6, 5, 4, 3]) {
+    const prefixes = ngeohash.bboxes(minLat, minLng, maxLat, maxLng, precision);
+    if (prefixes.length <= maxPrefixes) return prefixes;
+  }
+  return ngeohash.bboxes(minLat, minLng, maxLat, maxLng, 2);
+}

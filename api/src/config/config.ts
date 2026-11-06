@@ -89,6 +89,12 @@ const objectSchema = z.object({
   WORLD_ALLOW_LEGACY_PROOFS: bool('false'),
   REPORTER_SESSION_HOURS: z.coerce.number().positive().default(12),
 
+  // Shared secret the dispatch agent sends to record its trips (POST /v1/trips). Empty = trips are
+  // not recorded. openssl rand -hex 32
+  AGENT_API_TOKEN: optional.refine((v) => v === undefined || v.length >= 24, {
+    message: 'AGENT_API_TOKEN must be at least 24 characters (openssl rand -hex 32)',
+  }),
+
   // Independent verification: the Chainlink CRE workflow (cre/kneedeep-verify) attests its own
   // recomputation of every area to this contract. Empty = verification not shown.
   CRE_ATTESTATIONS_ADDRESS: z

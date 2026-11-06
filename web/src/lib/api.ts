@@ -84,6 +84,8 @@ export interface AreaSummary {
   confidenceLabel: 'high' | 'medium' | 'low';
   explanation: string;
   source: 'live' | 'simulated' | 'mixed';
+  passability?: Passability;
+  passabilityReason?: string;
 }
 
 export interface AgentQuery {
@@ -220,3 +222,72 @@ export type Verification =
       areas: VerifiedArea[];
       note: string;
     };
+
+export type Passability = 'safe' | 'risky' | 'blocked' | 'unknown';
+
+/** GET /v1/trips: dispatch decisions recorded by agents. */
+export interface TripCheckpoint {
+  name: string;
+  lat: number;
+  lng: number;
+  cell: string | null;
+  level: string | null;
+  confidence: number | null;
+  passability: Passability;
+  reason: string;
+  txId: string | null;
+  hashscan: string | null;
+}
+
+export interface TripRoute {
+  id: string;
+  name: string;
+  distanceKm: number;
+  verdict: 'chosen' | 'rejected' | 'passed_over';
+  reason: string;
+  avgConfidence: number;
+  checkpoints: TripCheckpoint[];
+}
+
+export interface Trip {
+  id: string;
+  createdAt: string;
+  origin: { name: string; lat: number; lng: number };
+  destination: { name: string; lat: number; lng: number };
+  vehicle: string;
+  routes: TripRoute[];
+  chosenRoute: string | null;
+  outcome: 'dispatched' | 'held';
+  reasons: string[];
+  totalCostTinybars: string;
+  txIds: string[];
+  network: string | null;
+  dataStatus: 'live' | 'simulated' | 'mixed' | 'empty';
+  paymentsRecorded: number;
+}
+
+export interface Trips {
+  generatedAt: string;
+  trips: Trip[];
+}
+
+/** GET /v1/coverage: how much each cell's evidence can be trusted (never what it says). */
+export type CoverageState = 'corroborated' | 'unverified' | 'conflicting' | 'stale';
+
+export interface CoverageCell {
+  cell: string;
+  /** [minLat, minLng, maxLat, maxLng] */
+  bounds: [number, number, number, number];
+  state: CoverageState;
+  humans: number;
+  evidenceAgeMin: number;
+  source: 'live' | 'simulated' | 'mixed';
+  reason: string;
+}
+
+export interface Coverage {
+  generatedAt: string;
+  bbox: [number, number, number, number];
+  truncated: boolean;
+  cells: CoverageCell[];
+}

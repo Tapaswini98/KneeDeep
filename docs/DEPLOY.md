@@ -90,6 +90,8 @@ gunzip -c backups/<file>.sql.gz | docker compose exec -T postgres psql -U kneede
    web service: free instances sleep, which pauses payouts and slows the first query after a pause.
 4. Deploy. Render terminates HTTPS on `https://<service>.onrender.com` (or your custom domain) and
    checks `/health/live`.
+5. To show the dispatch agent's trips on the map, copy the generated `AGENT_API_TOKEN` from the service's
+   Environment tab into the agent's `.env`, then run `KNEEDEEP_API_URL=https://<service>.onrender.com npm run agent`.
 
 ## Other platforms
 

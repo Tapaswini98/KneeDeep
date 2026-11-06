@@ -44,13 +44,20 @@ flowchart LR
 2. **Confirm or dispute.** Verified humans within 1 km vote on live reports. Each vote is its own Arkiv
    entity and expires with its report.
 3. **Query and pay.** An agent calls `GET /v1/conditions?lat&lng&radius`, gets `402`, pays 0.1 HBAR via
-   x402 on Hedera with no human approval, and receives a level per cell with a confidence score and the
-   evidence behind it.
-4. **Decide.** The dispatch agent pays for every checkpoint on both candidate routes and takes the safer
-   one, explaining why (knee-deep or worse is impassable for a scooter; no data is never "dry").
+   x402 on Hedera with no human approval, and receives a level per cell with a confidence score, the
+   evidence behind it, and a **passability** for its vehicle (`safe | risky | blocked | unknown`, with a
+   reason). `safe` always needs two or more independent humans; no data, contested or stale evidence is
+   `unknown`, never safe.
+4. **Decide.** The dispatch agent pays for every checkpoint on both candidate routes, drops any route
+   with a `blocked` checkpoint, prefers the fewest `risky` then `unknown` checkpoints, and **dispatches or
+   holds** the delivery. Its decision and reasons appear on the map: the chosen route solid green, the
+   rejected one dashed red.
 5. **Earn.** 70% of every paid query is credited to the verified humans whose live reports it used, if
    another verified human corroborated them. Earnings go out in **one batched Hedera transfer** to every
    reporter's own account. Simulated data never earns.
+
+The free **coverage** layer shows how much to trust what KneeDeep knows about each cell (corroborated,
+unverified, conflicting, stale, or no data) without saying what the evidence says: that is the paid answer.
 
 Design rationale (expiry, confidence formula, anti-gaming, privacy): [docs/design.md](docs/design.md).
 
@@ -106,14 +113,17 @@ services and prints PASS/FAIL per step:
 | World ID | Server-signed IDKit context; no session, a bot's dev identity and a forged proof (sent to World's verify API) are all refused, and nothing is written                                                                                                                   |
 | Arkiv    | Demo scenario written; the API serves it; the same data is readable straight from Arkiv                                                                                                                                                                                 |
 | Hedera   | Unpaid query gets 402; the agent pays with its own key and gets "knee, high" at Andheri; the mirror node confirms the settlement; simulated reports earn nothing; the clear route reads dry; the dashboard shows the HashScan link; an invalid paid query costs nothing |
-| Agent    | Pays for all 6 checkpoints on both routes and picks the dry Western Express Highway over flooded S.V. Road                                                                                                                                                              |
+| Agent    | Pays for all 6 checkpoints on both routes, dispatches via the safe Western Express Highway (3 of 3 safe) and rejects blocked S.V. Road; records the trip, whose 6 payments match the ledger                                                                             |
 | Expiry   | A report vanishes from Arkiv and the API when it expires, with no cleanup job (2-3 min)                                                                                                                                                                                 |
 
 It spends 0.8 testnet HBAR from the agent (0.2 with `--quick`). Re-run checks only with `npm run demo:check`
 (`-- --quick` skips the expiry wait, `-- --no-seed` skips the scenario). Refresh the scenario alone with
-`npm run demo:seed`. The scenario follows the agent's two routes: S.V. Road via the subways is flooded
-(Khar ankle, Milan waist, Andheri knee), the Western Express Highway is dry. Every entry is labelled
-`simulated`.
+`npm run demo:seed`. The scenario follows the agent's two routes: S.V. Road via the subways is blocked
+(Khar ankle, Milan waist, Andheri knee), the Western Express Highway is dry at every checkpoint, each
+backed by two or more humans. Sion (one report) and King's Circle (contradicting reports) fill out the coverage
+layer. `npm run demo:seed:peak` makes the flood peak: Vile Parle flyover goes knee-deep, every route is
+blocked, and the agent **holds** the delivery; `npm run demo:seed` restores the evening. Every entry is
+labelled `simulated`.
 
 ## Trying it end to end
 
@@ -167,7 +177,10 @@ becomes `"dataStatus": "empty"`.
 | Endpoint                              | Auth               | What                                                                              |
 | ------------------------------------- | ------------------ | --------------------------------------------------------------------------------- |
 | `GET /v1`                             | none               | Catalog: what is for sale and the price                                           |
-| `GET /v1/conditions?lat&lng&radius`   | **x402**, 0.1 HBAR | Fused level per ~150 m cell, confidence, and the inputs behind it                 |
+| `GET /v1/conditions?lat&lng&radius`   | **x402**, 0.1 HBAR | Per ~150 m cell: level, confidence, passability for `vehicle`, and the inputs     |
+| `GET /v1/coverage?bbox`               | none               | Per cell in view: corroborated / unverified / conflicting / stale (never a level) |
+| `GET /v1/trips`, `GET /v1/trips/:id`  | none               | Agent dispatch decisions: routes, checkpoints, reasons, HashScan links            |
+| `POST /v1/trips`                      | agent token        | The agent records a decision (`Authorization: Bearer $AGENT_API_TOKEN`)           |
 | `GET /v1/reports?lat&lng&radius`      | none               | Raw live reports with votes, expiry and Arkiv links                               |
 | `GET /v1/activity`                    | none               | Recent agent queries (answer, payment, HashScan) and reporter payouts             |
 | `GET /v1/identity/context`            | none               | Signed IDKit request context (the RP signing key stays on the server)             |

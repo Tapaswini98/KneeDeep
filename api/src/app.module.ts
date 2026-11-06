@@ -8,6 +8,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ArkivModule } from './arkiv/arkiv.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { ConfigModule } from './config/config.module';
+import { CoverageModule } from './coverage-map/coverage.module';
 import { DbModule } from './db/db.module';
 import { HealthController } from './health/health.controller';
 import { HederaModule } from './hedera/hedera.module';
@@ -15,6 +16,7 @@ import { IdentityModule } from './identity/identity.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { ReportsModule } from './reports/reports.module';
+import { TripsModule } from './trips/trips.module';
 import { VerificationModule } from './verification/verification.module';
 
 /** The built web app (npm run build -w web). When present, the API serves it: one origin, one deploy. */
@@ -37,6 +39,7 @@ function webApp(): DynamicModule[] {
     // Per-IP limits; write endpoints set tighter ones with @Throttle.
     ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 300 }] }),
     ConfigModule,
+    CoverageModule,
     DbModule,
     ArkivModule,
     HederaModule,
@@ -44,6 +47,7 @@ function webApp(): DynamicModule[] {
     PaymentsModule,
     PayoutsModule,
     ReportsModule,
+    TripsModule,
     VerificationModule,
     ...webApp(),
   ],

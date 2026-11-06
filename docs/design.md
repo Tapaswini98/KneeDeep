@@ -108,17 +108,32 @@ than many reports earn. The batch id is the idempotency key:
 
 So an earning is in at most one batch, and no batch is ever paid twice.
 
-## 8. The agent's route decision
+## 8. Passability, the route decision, and coverage
 
-Deterministic rules ([agent/src/decide.ts](../agent/src/decide.ts)) for a delivery scooter: dry is
-clear, ankle-deep is slow, knee-deep or worse is impassable, contested or no data is unknown
-(absence of reports is not evidence of a dry road). A route is as bad as its worst checkpoint.
-The agent never picks an impassable route; among the rest it picks the lowest risk, then the
-shortest, and holds the delivery if every route is impassable. Safety first: one unconfirmed
-report of deep water is enough to avoid a route when there is an alternative, and its confidence
-is always printed next to the decision. Spending is bounded twice: per query (the client refuses
-to sign above `AGENT_MAX_TINYBARS_PER_QUERY`) and per trip (it prices the trip from the catalog
-before paying anything).
+**Passability** ([api/src/fusion/passability.ts](../api/src/fusion/passability.ts)) turns a fused
+answer into `safe | risky | blocked | unknown` for a vehicle, with a reason. It lives next to the
+fusion engine and is returned by `/v1/conditions`, so the API and every agent read the same verdict.
+Rules, first match wins: no reports, contested, or newest evidence older than 90 min is `unknown`;
+corroborated water the vehicle cannot cross is `blocked` (knee-deep or worse for a two-wheeler);
+uncorroborated water of any depth is `risky`; corroborated dry or ankle-deep is `safe`; a lone dry
+report is `unknown`. "Corroborated" means medium or high confidence **and** two or more independent
+humans: one fresh report reaches "medium" confidence, and `safe` must never rest on one person's
+word. Absence of reports never makes a cell safe.
+
+**The route decision** ([agent/src/decide.ts](../agent/src/decide.ts)) only applies a policy to
+those verdicts: discard any route with a `blocked` checkpoint, then prefer the fewest `risky`, then
+the fewest `unknown`, then the higher average confidence, then the shorter route; if nothing is left,
+**hold** the delivery. Every route gets a plain-sentence reason. The agent records the decision
+(`POST /v1/trips`, authenticated with `AGENT_API_TOKEN` so nobody can draw fake trips), and the map
+shows it; the server counts how many of the trip's payments are settled queries in its own ledger.
+Spending is bounded twice: per query (the client refuses to sign above
+`AGENT_MAX_TINYBARS_PER_QUERY`) and per trip (it prices the trip from the catalog before paying).
+
+**Coverage** ([api/src/fusion/coverage.ts](../api/src/fusion/coverage.ts)) says how far to trust what
+is known about a cell, never what it says: `stale` (newest evidence over 90 min), `conflicting`
+(contested, disputed or contradicted), `corroborated` (2+ humans, newest within 60 min) or
+`unverified`. It is free (`GET /v1/coverage`); what the evidence says is the paid answer. A cell with
+no live reports has no coverage: unknown, not dry.
 
 ## 9. Independent verification with Chainlink CRE
 
