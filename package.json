@@ -31,7 +31,13 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "docker:up": "docker compose up --build -d && echo 'KneeDeep on http://localhost:8080 (map) and http://localhost:8080/report'",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f app",
+    "demo": "npm run docker:up && npm run demo:check",
+    "demo:check": "npm run e2e -w api --",
+    "demo:seed": "npm run seed -w api"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

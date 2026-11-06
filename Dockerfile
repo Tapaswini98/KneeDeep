@@ -14,7 +14,8 @@ COPY web web
 RUN npm run build -w web && npm run build -w api
 
 FROM node:22-alpine
-ENV NODE_ENV=production
+# NODE_ENV is the runtime switch; APP_ENV the deployment tier (compose sets staging).
+ENV NODE_ENV=production APP_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY api/package.json api/

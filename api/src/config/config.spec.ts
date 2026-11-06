@@ -1,7 +1,7 @@
-import { AppConfig, productionProblems } from './config';
+import { type AppConfig, deploymentProblems } from './config';
 
 const safe = {
-  NODE_ENV: 'production',
+  APP_ENV: 'production',
   REPORTER_VERIFIER: 'world',
   WORLD_ENVIRONMENT: 'production',
   PSEUDONYM_SALT: 'x'.repeat(64),
@@ -14,13 +14,28 @@ const safe = {
   HEDERA_PRIVATE_KEY: '0x3',
 } as unknown as AppConfig;
 
-describe('productionProblems', () => {
+const problems = (override: Partial<Record<keyof AppConfig, unknown>>) =>
+  deploymentProblems({ ...safe, ...override } as AppConfig).join('\n');
+
+describe('deploymentProblems', () => {
   it('accepts a complete production configuration', () => {
-    expect(productionProblems(safe)).toEqual([]);
+    expect(deploymentProblems(safe)).toEqual([]);
   });
 
   it('ignores development', () => {
-    expect(productionProblems({ ...safe, NODE_ENV: 'development', REPORTER_VERIFIER: 'dev' })).toEqual([]);
+    expect(problems({ APP_ENV: 'development', REPORTER_VERIFIER: 'dev', PSEUDONYM_SALT: undefined })).toBe(
+      '',
+    );
+  });
+
+  it('lets staging use the World ID simulator', () => {
+    expect(problems({ APP_ENV: 'staging', WORLD_ENVIRONMENT: 'staging' })).toBe('');
+  });
+
+  it('keeps staging strict about everything else', () => {
+    expect(
+      problems({ APP_ENV: 'staging', WORLD_ENVIRONMENT: 'staging', REPORTER_VERIFIER: 'dev' }),
+    ).toContain('REPORTER_VERIFIER');
   });
 
   it.each([
@@ -31,6 +46,6 @@ describe('productionProblems', () => {
     ['missing Arkiv key', { ARKIV_PRIVATE_KEY: undefined }, 'ARKIV_PRIVATE_KEY'],
     ['missing Hedera account', { HEDERA_ACCOUNT_ID: undefined }, 'HEDERA_ACCOUNT_ID'],
   ])('refuses %s in production', (_name, override, expected) => {
-    expect(productionProblems({ ...safe, ...override } as AppConfig).join('\n')).toContain(expected);
+    expect(problems(override)).toContain(expected);
   });
 });

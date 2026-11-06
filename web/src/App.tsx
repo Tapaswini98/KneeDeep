@@ -46,6 +46,12 @@ export function App() {
             </button>
           ))}
         </nav>
+        {health?.env && health.env !== 'production' && (
+          <span className="env-badge" title="Deployment tier">
+            {health.env}
+            {health.worldEnvironment === 'staging' ? ' · World ID simulator' : ''}
+          </span>
+        )}
         <span className={`status ${health?.ok ? 'up' : 'down'}`} title={JSON.stringify(health)}>
           {health ? (health.ok ? 'API up' : 'API degraded') : 'API down'}
         </span>

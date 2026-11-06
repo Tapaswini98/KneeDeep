@@ -562,3 +562,13 @@ button.chip.selected {
   flex-direction: column;
   gap: 10px;
 }
+
+.env-badge {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f5b942;
+  color: #3a2a00;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

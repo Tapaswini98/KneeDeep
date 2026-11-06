@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { jsonBody } from './common/json-body.middleware';
 import { REQUEST_ID_HEADER, requestContext } from './common/request-context.middleware';
-import { APP_CONFIG, type AppConfig, readConfig } from './config/config';
+import { APP_CONFIG, type AppConfig, isDeployed, readConfig } from './config/config';
 import { runMigrations } from './db/migrations';
 import { QUERY_ID_HEADER } from './payments/paywall';
 import { PaymentsService } from './payments/payments.service';
@@ -39,11 +39,7 @@ async function bootstrap() {
   // IDKit proofs are a few KB; nothing legitimate is larger.
   app.use(jsonBody('64kb'));
   app.enableCors({
-    origin: config.CORS_ORIGINS.length
-      ? config.CORS_ORIGINS
-      : config.NODE_ENV === 'production'
-        ? false
-        : DEV_ORIGINS,
+    origin: config.CORS_ORIGINS.length ? config.CORS_ORIGINS : isDeployed(config) ? false : DEV_ORIGINS,
     exposedHeaders: ['PAYMENT-REQUIRED', 'PAYMENT-RESPONSE', QUERY_ID_HEADER, REQUEST_ID_HEADER],
   });
   app.enableShutdownHooks();
@@ -52,7 +48,7 @@ async function bootstrap() {
   app.use(app.get(PaymentsService).middleware());
 
   await app.listen(config.PORT);
-  log.log(`KneeDeep API on http://localhost:${config.PORT} (${config.NODE_ENV}; health: /health)`);
+  log.log(`KneeDeep API on http://localhost:${config.PORT} (${config.APP_ENV}; health: /health)`);
 }
 
 bootstrap().catch((err) => {

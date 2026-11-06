@@ -3,13 +3,14 @@
  *   npm run db:migrate
  *   npm run db:reset      drops everything first (local only; refused in production)
  */
-import { readConfig } from '../src/config/config';
+import { isDeployed, readConfig } from '../src/config/config';
 import { runMigrations } from '../src/db/migrations';
 
 async function main() {
-  const { DATABASE_URL, NODE_ENV } = readConfig();
+  const config = readConfig();
   const reset = process.argv.includes('--reset');
-  if (reset && NODE_ENV === 'production') throw new Error('Refusing to reset a production database');
+  if (reset && isDeployed(config)) throw new Error(`Refusing to reset a ${config.APP_ENV} database`);
+  const { DATABASE_URL } = config;
   const applied = await runMigrations(DATABASE_URL, { reset });
   if (reset) console.log('Reset: dropped schema public');
   for (const name of applied) console.log(`Applied ${name}`);

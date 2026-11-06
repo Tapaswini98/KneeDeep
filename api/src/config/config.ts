@@ -18,12 +18,19 @@ const PLACEHOLDER_SALT = 'change-me-to-a-long-random-string';
 
 /**
  * Everything the API reads from the environment, validated once at boot.
- * In development, integration secrets are optional so the API boots during setup and each
- * integration refuses to work (loudly) without its settings. In production, the checks in
- * `productionProblems` make an unsafe configuration fail at boot instead.
+ *
+ * APP_ENV is the deployment tier:
+ *   development  lenient: integrations may be unconfigured, dev identities allowed.
+ *   staging      deployed and strict (real secrets, World ID required), but World ID runs
+ *                against the simulator (WORLD_ENVIRONMENT=staging) and chains are testnets.
+ *   production   strict, and real World App only.
+ * Strict tiers fail at boot on an unsafe configuration (see `deploymentProblems`).
+ * NODE_ENV stays the runtime switch (the Docker image always sets it to production).
  */
-const schema = z.object({
+const objectSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  // Defaults to production when NODE_ENV=production, otherwise development.
+  APP_ENV: z.enum(['development', 'staging', 'production']).optional(),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().default('postgres://kneedeep:kneedeep@localhost:5434/kneedeep'),
   PSEUDONYM_SALT: optional,
@@ -75,16 +82,27 @@ const schema = z.object({
   REPORTER_SESSION_HOURS: z.coerce.number().positive().default(12),
 });
 
+const schema = objectSchema.transform((c) => ({
+  ...c,
+  APP_ENV: c.APP_ENV ?? (c.NODE_ENV === 'production' ? ('production' as const) : ('development' as const)),
+}));
+
 export type AppConfig = z.infer<typeof schema>;
 
-/** Settings that are tolerable while building but must never reach a public deployment. */
-export function productionProblems(c: AppConfig): string[] {
-  if (c.NODE_ENV !== 'production') return [];
+/** True for deployed tiers (staging, production): strict checks, no dev conveniences. */
+export const isDeployed = (c: Pick<AppConfig, 'APP_ENV'>) => c.APP_ENV !== 'development';
+
+/** Settings that are tolerable while building but must never reach a deployed environment. */
+export function deploymentProblems(c: AppConfig): string[] {
+  if (!isDeployed(c)) return [];
   const problems: string[] = [];
   const require = (ok: unknown, msg: string) => !ok && problems.push(msg);
 
   require(c.REPORTER_VERIFIER === 'world', 'REPORTER_VERIFIER must be "world" (dev mode accepts anyone)');
-  require(c.WORLD_ENVIRONMENT === 'production', 'WORLD_ENVIRONMENT must be "production"');
+  if (c.APP_ENV === 'production') {
+    require(c.WORLD_ENVIRONMENT ===
+      'production', 'WORLD_ENVIRONMENT must be "production" (use APP_ENV=staging to test with the World ID simulator)');
+  }
   require(c.PSEUDONYM_SALT &&
     c.PSEUDONYM_SALT !== PLACEHOLDER_SALT &&
     c.PSEUDONYM_SALT.length >= 32, 'PSEUDONYM_SALT must be a random secret of at least 32 characters');
@@ -105,9 +123,11 @@ export function readConfig(): AppConfig {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid environment:\n${issues}`);
   }
-  const problems = productionProblems(parsed.data);
+  const problems = deploymentProblems(parsed.data);
   if (problems.length > 0) {
-    throw new Error(`Unsafe production configuration:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
+    throw new Error(
+      `Unsafe ${parsed.data.APP_ENV} configuration:\n${problems.map((p) => `  - ${p}`).join('\n')}`,
+    );
   }
   return parsed.data;
 }

@@ -45,6 +45,8 @@ export async function api<T>(path: string, init?: RequestInit & { token?: string
 
 export interface Health {
   ok: boolean;
+  env?: 'development' | 'staging' | 'production';
+  worldEnvironment?: 'production' | 'staging';
   postgres: { ok: boolean };
   arkiv: { ok: boolean; detail?: string };
   hedera: { ok: boolean; detail?: string };

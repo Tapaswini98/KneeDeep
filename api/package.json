@@ -14,7 +14,9 @@
     "arkiv:smoke": "tsx scripts/arkiv-smoke.ts",
     "hedera:balance": "tsx scripts/hedera-balance.ts",
     "simulate": "tsx scripts/simulate.ts",
-    "arkiv:query": "tsx scripts/arkiv-query.ts"
+    "arkiv:query": "tsx scripts/arkiv-query.ts",
+    "e2e": "tsx scripts/e2e.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@arkiv-network/sdk": "1.0.1",

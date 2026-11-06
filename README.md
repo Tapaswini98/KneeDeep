@@ -67,6 +67,45 @@ npm run dev                   # API on :3000, web on :5173 (Vite proxies /v1 to 
 
 Open http://localhost:5173. `GET /health` shows Postgres, Arkiv and Hedera status.
 
+**Or run everything in Docker** (Postgres + API + web app on one port, no Node tooling needed at runtime):
+
+```bash
+cp .env.example .env          # fill in keys
+npm run docker:up             # http://localhost:8080 (map) and http://localhost:8080/report
+npm run docker:logs           # follow the app's logs
+npm run docker:down           # stop (add -v to docker compose down to wipe the database)
+```
+
+The container runs as the **staging** tier: production build and strict checks (real secrets, World ID
+required, dev identities refused), with World ID on the simulator and testnets. A `STAGING` badge shows in
+the header. Use `DOCKER_APP_ENV=production npm run docker:up` for real World App only, or
+`DOCKER_APP_ENV=development` for the lenient tier. Tiers are described in `.env.example` (`APP_ENV`).
+Point the agent at the container with `KNEEDEEP_API_URL=http://localhost:8080 npm run agent`.
+
+## Demo: one command
+
+```bash
+npm run demo
+```
+
+Builds and starts everything in Docker (Postgres + API + web app on http://localhost:8080, staging tier),
+writes a **simulated monsoon evening** to Arkiv, then runs an end-to-end check against the real
+services and prints PASS/FAIL per step:
+
+| Area     | What is checked                                                                                                                                                                                                                         |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform | Readiness (Postgres, Arkiv, Hedera), web app served, catalog and price                                                                                                                                                                  |
+| World ID | Server-signed IDKit context; no session, a bot's dev identity and a forged proof (sent to World's verify API) are all refused, and nothing is written                                                                                   |
+| Arkiv    | Demo scenario written; the API serves it; the same data is readable straight from Arkiv                                                                                                                                                 |
+| Hedera   | Unpaid query gets 402; the agent pays with its own key and gets "knee, high" at Andheri; the mirror node confirms the settlement; the clear route reads dry; the dashboard shows the HashScan link; an invalid paid query costs nothing |
+| Expiry   | A report vanishes from Arkiv and the API when it expires, with no cleanup job (2-3 min)                                                                                                                                                 |
+
+It spends 0.2 testnet HBAR from the agent. Re-run checks only with `npm run demo:check`
+(`-- --quick` skips the expiry wait, `-- --no-seed` skips the scenario). Refresh the scenario alone with
+`npm run demo:seed`. The scenario follows the agent's two routes: S.V. Road via the subways is flooded
+(Khar ankle, Milan waist, Andheri knee), the Western Express Highway is dry. Every entry is labelled
+`simulated`.
+
 ## Trying it end to end
 
 **Without a phone (dev mode).** Set `REPORTER_VERIFIER=dev`: identities are free and everything they
@@ -187,15 +226,15 @@ the integration debrief: [docs/WORLD_DEBRIEF.md](docs/WORLD_DEBRIEF.md).
 
 ## Production readiness
 
-| Concern       | What is in place                                                                                                                                                                              |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Configuration | Validated at boot (zod). With `NODE_ENV=production` the API refuses dev identities, staging World ID, placeholder secrets or missing keys.                                                    |
-| Security      | Helmet headers, CORS allowlist, 64 KB body limit, per-IP rate limits (tighter on identity and writes), RP signing key server-only, no internals in error bodies.                              |
-| Abuse         | World ID uniqueness, one report per human per cell per 30 min (race-free reservation), one vote per human per report, votes only from within 1 km.                                            |
-| Correctness   | Reports and votes reserve a Postgres row before the Arkiv write and release it on failure; Arkiv writes are serialised per wallet (nonce safety); settled payments are recorded idempotently. |
-| Observability | Request ids on every response and log line; one log line per request; readiness and liveness endpoints.                                                                                       |
-| Deployment    | One Docker image: the API serves the built web app. Migrations run on boot (`MIGRATE_ON_BOOT=true`) under an advisory lock.                                                                   |
-| Quality       | 59 unit tests (fusion, identity, sessions, report/vote rules, config, geo), ESLint, Prettier, CI on every push.                                                                               |
+| Concern       | What is in place                                                                                                                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Configuration | Validated at boot (zod). Deployment tiers (`APP_ENV`): in staging and production the API refuses dev identities, placeholder secrets or missing keys; production also refuses the World ID simulator. |
+| Security      | Helmet headers, CORS allowlist, 64 KB body limit, per-IP rate limits (tighter on identity and writes), RP signing key server-only, no internals in error bodies.                                      |
+| Abuse         | World ID uniqueness, one report per human per cell per 30 min (race-free reservation), one vote per human per report, votes only from within 1 km.                                                    |
+| Correctness   | Reports and votes reserve a Postgres row before the Arkiv write and release it on failure; Arkiv writes are serialised per wallet (nonce safety); settled payments are recorded idempotently.         |
+| Observability | Request ids on every response and log line; one log line per request; readiness and liveness endpoints.                                                                                               |
+| Deployment    | One Docker image: the API serves the built web app. Migrations run on boot (`MIGRATE_ON_BOOT=true`) under an advisory lock.                                                                           |
+| Quality       | 59 unit tests (fusion, identity, sessions, report/vote rules, config, geo), ESLint, Prettier, CI on every push.                                                                                       |
 
 ```bash
 docker compose --profile app up --build      # Postgres + the app on http://localhost:8080

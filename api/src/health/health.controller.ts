@@ -1,6 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { ArkivService } from '../arkiv/arkiv.service';
+import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { HederaService } from '../hedera/hedera.service';
 
@@ -25,6 +26,7 @@ async function check(fn: () => Promise<string | undefined>): Promise<Check> {
 @Controller('health')
 export class HealthController {
   constructor(
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly db: DbService,
     private readonly arkiv: ArkivService,
     private readonly hedera: HederaService,
@@ -53,6 +55,13 @@ export class HealthController {
         return `${this.hedera.accountId} on ${this.hedera.network}`;
       }),
     ]);
-    return { ok: postgres.ok && arkiv.ok && hedera.ok, postgres, arkiv, hedera };
+    return {
+      ok: postgres.ok && arkiv.ok && hedera.ok,
+      env: this.config.APP_ENV,
+      worldEnvironment: this.config.WORLD_ENVIRONMENT,
+      postgres,
+      arkiv,
+      hedera,
+    };
   }
 }
