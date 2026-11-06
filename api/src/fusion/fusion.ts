@@ -14,7 +14,8 @@
  *        freshness     = 0.5 + 0.5 * w(newest supporting evidence)
  *      A single human can never reach "high".
  */
-import { Level, LEVELS, Source, Vote } from '../arkiv/schemas';
+// Dependency-free on purpose: this file also runs inside the CRE workflow (cre/kneedeep-verify).
+import { type Level, LEVELS, type Source, type Vote } from '../arkiv/vocabulary';
 
 export interface ReportInput {
   key: string;

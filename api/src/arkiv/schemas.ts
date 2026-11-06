@@ -1,15 +1,6 @@
 import { defineSchema, key, str, u64 } from '@arkiv-network/sdk/schema';
 
-/** Water level a reporter saw, in increasing severity. */
-export const LEVELS = ['dry', 'ankle', 'knee', 'waist', 'closed'] as const;
-export type Level = (typeof LEVELS)[number];
-
-/** 'simulated' marks demo data. The API never presents it as live. */
-export const SOURCES = ['live', 'simulated'] as const;
-export type Source = (typeof SOURCES)[number];
-
-export const VOTES = ['confirm', 'dispute'] as const;
-export type Vote = (typeof VOTES)[number];
+export { LEVELS, type Level, SOURCES, type Source, VOTES, type Vote } from './vocabulary';
 
 /**
  * One street-level observation. Public, readable by anyone, and gone when it expires.
