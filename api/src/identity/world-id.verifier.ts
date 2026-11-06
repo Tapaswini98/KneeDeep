@@ -93,6 +93,11 @@ export class WorldIdVerifier implements HumanVerifier {
     const human = body.results?.find((r) => r.success && credentials.includes(r.identifier));
     const nullifier = human?.nullifier ?? (body.results ? undefined : body.nullifier);
     if (!nullifier) throw new UnauthorizedException('Proof of Human was not verified');
+    // World's answer is the authority; the browser's copy should match it. Flag it if not.
+    const claimed = result.responses.find((x) => credentials.includes(x.identifier))?.nullifier;
+    if (claimed && !sameField(claimed, nullifier)) {
+      this.log.warn("World returned a different nullifier than the proof carried; using World's");
+    }
 
     // Normalise (hex or decimal) so one human always maps to one pseudonym per protocol version.
     const version = result.protocol_version === '4.0' ? 'v4' : 'v3';

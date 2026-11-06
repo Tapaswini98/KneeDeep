@@ -11,12 +11,15 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
+import { arkivExplorerEntity, arkivExplorerTx } from '../arkiv/client';
 import { APP_CONFIG, AppConfig } from '../config/config';
+import { cellCenter } from '../geo/geo';
 import { hashscanAccountUrl, hashscanTxUrl } from '../hedera/keys';
 import { fetchAccount } from '../hedera/mirror';
 import { SessionsService } from '../identity/sessions.service';
 import { HEDERA_ACCOUNT_ID } from './payout-plan';
 import { PayoutsRepository } from './payouts.repository';
+import { ReportersRepository } from './reporters.repository';
 
 const payoutAccountSchema = z.object({
   accountId: z
@@ -33,6 +36,7 @@ export class ReportersController {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly sessions: SessionsService,
     private readonly payouts: PayoutsRepository,
+    private readonly reporters: ReportersRepository,
   ) {}
 
   @Get()
@@ -55,6 +59,45 @@ export class ReportersController {
       payouts: e.payouts.map((p) => ({
         ...p,
         hashscan: p.txId ? hashscanTxUrl(p.network ?? net, p.txId) : null,
+      })),
+    };
+  }
+
+  /**
+   * Everything this reporter did and what it earned: their reports (live and expired) with the votes
+   * they received and the paid answers they were used in, and the votes they cast.
+   */
+  @Get('activity')
+  async activity(@Headers('authorization') auth: string | undefined) {
+    const who = this.sessions.authenticate(auth);
+    const [summary, reports, votes] = await Promise.all([
+      this.reporters.summary(who.pseudonym),
+      this.reporters.reports(who.pseudonym),
+      this.reporters.votes(who.pseudonym),
+    ]);
+    return {
+      reporter: who.pseudonym.slice(0, 12),
+      summary,
+      reports: reports.map(({ arkivTx, ...r }) => ({
+        ...r,
+        center: cellCenter(r.cell),
+        explorer: { entity: arkivExplorerEntity(r.key), tx: arkivTx ? arkivExplorerTx(arkivTx) : null },
+      })),
+      votes: votes.map((v) => ({
+        key: v.key,
+        vote: v.vote,
+        votedAt: v.votedAt,
+        reportEarned: v.reportEarned,
+        report: v.reportCell
+          ? {
+              key: v.reportKey,
+              level: v.reportLevel,
+              source: v.reportSource,
+              live: v.reportLive ?? false,
+              center: cellCenter(v.reportCell),
+            }
+          : null,
+        explorer: { entity: arkivExplorerEntity(v.key), report: arkivExplorerEntity(v.reportKey) },
       })),
     };
   }

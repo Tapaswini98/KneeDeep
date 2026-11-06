@@ -178,7 +178,15 @@ export class ReportsService {
         now - r.reportedAt <= DEFAULT_MAX_AGE_MIN * 60 &&
         distanceMeters({ lat, lng }, cellCenter(r.cell)) <= radiusM + CELL_HALF_DIAGONAL_M,
     );
-    const txs = await this.repo.arkivTxFor(near.map((r) => r.key));
+    const keys = near.map((r) => r.key);
+    const [txs, indexed] = await Promise.all([this.repo.arkivTxFor(keys), this.repo.votesOn(keys)]);
+    // One vote per (report, voter): Arkiv's, plus any we just wrote that its index has not caught up with.
+    const votesByReport = new Map<string, Map<string, Vote>>();
+    for (const v of [...votes, ...indexed]) {
+      const forReport = votesByReport.get(v.report) ?? new Map<string, Vote>();
+      forReport.set(v.voter, v.vote);
+      votesByReport.set(v.report, forReport);
+    }
     return {
       generatedAt: new Date().toISOString(),
       arkivBlock: block.toString(),
@@ -187,7 +195,10 @@ export class ReportsService {
       reports: near
         .sort((a, b) => b.reportedAt - a.reportedAt)
         .map((r: LiveReport) => {
-          const rv = votes.filter((v) => v.report === r.key);
+          const rv = [...(votesByReport.get(r.key) ?? new Map<string, Vote>())].map(([voter, vote]) => ({
+            voter,
+            vote,
+          }));
           return {
             key: r.key,
             level: r.level,

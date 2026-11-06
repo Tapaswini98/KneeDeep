@@ -59,8 +59,7 @@ export function Earnings({ session }: { session: ReporterSession }) {
         </div>
       </div>
       <p className="muted small">
-        {e.queriesCredited} paid agent {e.queriesCredited === 1 ? 'query' : 'queries'} used your reports.{' '}
-        {e.rule}
+        Credited by {e.queriesCredited} paid agent {e.queriesCredited === 1 ? 'answer' : 'answers'}. {e.rule}
       </p>
 
       {showForm ? (

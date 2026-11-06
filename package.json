@@ -32,7 +32,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "docker:up": "docker compose up --build -d && echo 'KneeDeep on http://localhost:8080 (map) and http://localhost:8080/report'",
+    "docker:up": "docker compose up --build -d && echo 'KneeDeep on http://localhost:8080 (map: /map, report: /report, my activity: /me)'",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f app",
     "demo": "npm run docker:up && npm run demo:check",

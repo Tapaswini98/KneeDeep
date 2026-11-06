@@ -1,5 +1,11 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { HUMAN_VERIFIER, HumanVerifier, pseudonymFor } from './human-verifier';
@@ -24,6 +30,8 @@ const b64 = (s: string | Buffer) => Buffer.from(s).toString('base64url');
  */
 @Injectable()
 export class SessionsService {
+  private readonly log = new Logger(SessionsService.name);
+
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(HUMAN_VERIFIER) private readonly verifier: HumanVerifier,
@@ -47,7 +55,14 @@ export class SessionsService {
   async open(proof: unknown) {
     const human = await this.verifier.verify(proof);
     const pseudonym = pseudonymFor(this.salt, human.nullifier);
-    await this.db.query('INSERT INTO reporters (pseudonym) VALUES ($1) ON CONFLICT DO NOTHING', [pseudonym]);
+    const created = await this.db.query(
+      'INSERT INTO reporters (pseudonym) VALUES ($1) ON CONFLICT DO NOTHING RETURNING pseudonym',
+      [pseudonym],
+    );
+    // The reporter tag is already public (on Arkiv and the map); the nullifier is never logged.
+    this.log.log(
+      `Reporter session opened: ${pseudonym.slice(0, 12)} (${human.method}, ${created.length ? 'new human' : 'returning human'})`,
+    );
 
     const exp = Math.floor(Date.now() / 1000) + Math.round(this.config.REPORTER_SESSION_HOURS * 3600);
     const payload = b64(JSON.stringify({ sub: pseudonym, m: human.method, exp } satisfies Claims));

@@ -87,4 +87,17 @@ export class ReportsRepository {
     );
     return new Map(rows.map((r) => [r.entity_key, r.arkiv_tx]));
   }
+
+  /**
+   * Votes we wrote on these reports. Arkiv's query index can trail a fresh write by a block or two;
+   * merging these in means a voter sees their own vote the moment it is accepted.
+   */
+  async votesOn(reportKeys: string[]): Promise<{ report: string; voter: string; vote: Vote }[]> {
+    if (reportKeys.length === 0) return [];
+    return this.db.query<{ report: string; voter: string; vote: Vote }>(
+      `SELECT report_key AS report, voter, vote FROM vote_index
+       WHERE report_key = ANY($1) AND status = 'written'`,
+      [reportKeys],
+    );
+  }
 }

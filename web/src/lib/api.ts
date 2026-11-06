@@ -146,3 +146,51 @@ export interface ReporterEarnings {
 
 export const formatHbar = (tinybars: string | number) =>
   `${(Number(tinybars) / 1e8).toLocaleString(undefined, { maximumFractionDigits: 4 })} HBAR`;
+
+/** GET /v1/reporters/me/activity: the signed-in reporter's own reports and votes. */
+export interface MyReport {
+  key: string;
+  level: string;
+  cell: string;
+  center: { lat: number; lng: number };
+  source: 'live' | 'simulated';
+  reportedAt: string;
+  expiresAt: string | null;
+  live: boolean;
+  confirmations: number;
+  disputes: number;
+  paidAnswers: number;
+  earningAnswers: number;
+  earnedTinybars: string;
+  explorer: { entity: string; tx: string | null };
+}
+
+export interface MyVote {
+  key: string;
+  vote: 'confirm' | 'dispute';
+  votedAt: string;
+  reportEarned: boolean;
+  report: {
+    key: string;
+    level: string | null;
+    source: 'live' | 'simulated' | null;
+    live: boolean;
+    center: { lat: number; lng: number };
+  } | null;
+  explorer: { entity: string; report: string };
+}
+
+export interface MyActivity {
+  reporter: string;
+  summary: {
+    reports: number;
+    liveReports: number;
+    confirmationsReceived: number;
+    disputesReceived: number;
+    votes: number;
+    paidAnswers: number;
+    earnedTinybars: string;
+  };
+  reports: MyReport[];
+  votes: MyVote[];
+}

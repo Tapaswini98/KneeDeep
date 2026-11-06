@@ -76,7 +76,7 @@ Open http://localhost:5173. `GET /health` shows Postgres, Arkiv and Hedera statu
 
 ```bash
 cp .env.example .env          # fill in keys
-npm run docker:up             # http://localhost:8080 (map) and http://localhost:8080/report
+npm run docker:up             # http://localhost:8080: home, /map, /report, /me
 npm run docker:logs           # follow the app's logs
 npm run docker:down           # stop (add -v to docker compose down to wipe the database)
 ```
@@ -133,22 +133,26 @@ to fly to it. Every report links to its entity on the Arkiv explorer.
 - _World App:_ `WORLD_ENVIRONMENT=production`, then scan the QR with World App.
 - If World App returns a legacy 3.0 proof (the error says so), set `WORLD_ALLOW_LEGACY_PROOFS=true`.
 
-**Confirm and dispute from anywhere.** Votes need you within 1 km of the report, using the browser's
-real location. To test remotely, override it in Chrome DevTools: ⋮ → More tools → **Sensors** →
-Location → Other, e.g. `19.1197, 72.8464` (Andheri subway), and keep DevTools open. You cannot vote on
-your own report, so vote on the seeded ones (`npm run demo:seed`) or use a second simulator identity in
-another browser profile.
+**Confirm and dispute from anywhere.** Votes need you within 1 km of the report. Outside production, the
+top bar has a **test location** picker (e.g. Andheri subway): reporting, voting and the map then use that
+spot instead of GPS, and the map shows it with the 1 km voting circle. Production always uses real GPS
+(the server cannot verify GPS either way: the 1 km rule keeps honest clients local, it is not a proof).
+You cannot vote on your own report: vote on the seeded ones (`npm run demo:seed`) or use a second
+simulator identity in another browser profile.
 
 **Reporter payouts end to end** (two World ID simulator identities, A and B, in two browser profiles,
-both with the Sensors location set to Andheri subway):
+both with the test location set to Andheri subway):
 
 1. A and B each verify, open `/report`, share location and report **Knee** (or B confirms A's report).
    Two live humans agreeing makes both reports corroborated.
-2. Each adds a Hedera testnet account under **Your earnings** (any account that is not the platform's).
+2. Each opens **My activity** (`/me`), adds a Hedera testnet account under **Earnings and payouts** (any
+   account that is not the platform's), and sees the other's report under **Reports to confirm or
+   dispute**.
 3. `npm run demo:agent`: the agent pays for Andheri subway (and 5 other checkpoints). Each paid answer
    that used A's and B's reports credits them 70% of 0.1 HBAR, split equally: "owed" goes up.
 4. `npm run payout`: one Hedera transfer pays both. The HashScan link appears in the CLI, under
-   **Your earnings** and in **Reporter payouts** on the map. Run it again: nothing is paid twice.
+   **My activity** (per report: paid answers used in, amount earned) and in **Reporter payouts** on the
+   map. Run it again: nothing is paid twice.
 
 The API also runs a batch every `PAYOUT_INTERVAL_MINUTES` (default 60; 0 = only on demand).
 
@@ -157,20 +161,21 @@ becomes `"dataStatus": "empty"`.
 
 ## API
 
-| Endpoint                              | Auth               | What                                                                   |
-| ------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
-| `GET /v1`                             | none               | Catalog: what is for sale and the price                                |
-| `GET /v1/conditions?lat&lng&radius`   | **x402**, 0.1 HBAR | Fused level per ~150 m cell, confidence, and the inputs behind it      |
-| `GET /v1/reports?lat&lng&radius`      | none               | Raw live reports with votes, expiry and Arkiv links                    |
-| `GET /v1/activity`                    | none               | Recent agent queries (answer, payment, HashScan) and reporter payouts  |
-| `GET /v1/identity/context`            | none               | Signed IDKit request context (the RP signing key stays on the server)  |
-| `POST /v1/identity/session`           | proof              | Exchange a World ID Proof of Human for a reporter session: `{ proof }` |
-| `GET /v1/identity/me`                 | session            | Whether a stored session is still valid                                |
-| `POST /v1/reports`                    | session            | Submit a report: `{ level, lat, lng }`                                 |
-| `POST /v1/reports/:key/votes`         | session            | Confirm or dispute: `{ vote, lat, lng }`; within 1 km, once per report |
-| `GET /v1/reporters/me`                | session            | Your earnings: owed, being paid, paid, payout transactions             |
-| `PUT /v1/reporters/me/payout-account` | session            | `{ accountId: "0.0.x" \| null }`; checked on the mirror node           |
-| `GET /health`, `GET /health/live`     | none               | Readiness (Postgres, Arkiv, Hedera) and liveness                       |
+| Endpoint                              | Auth               | What                                                                              |
+| ------------------------------------- | ------------------ | --------------------------------------------------------------------------------- |
+| `GET /v1`                             | none               | Catalog: what is for sale and the price                                           |
+| `GET /v1/conditions?lat&lng&radius`   | **x402**, 0.1 HBAR | Fused level per ~150 m cell, confidence, and the inputs behind it                 |
+| `GET /v1/reports?lat&lng&radius`      | none               | Raw live reports with votes, expiry and Arkiv links                               |
+| `GET /v1/activity`                    | none               | Recent agent queries (answer, payment, HashScan) and reporter payouts             |
+| `GET /v1/identity/context`            | none               | Signed IDKit request context (the RP signing key stays on the server)             |
+| `POST /v1/identity/session`           | proof              | Exchange a World ID Proof of Human for a reporter session: `{ proof }`            |
+| `GET /v1/identity/me`                 | session            | Whether a stored session is still valid                                           |
+| `POST /v1/reports`                    | session            | Submit a report: `{ level, lat, lng }`                                            |
+| `POST /v1/reports/:key/votes`         | session            | Confirm or dispute: `{ vote, lat, lng }`; within 1 km, once per report            |
+| `GET /v1/reporters/me`                | session            | Your earnings: owed, being paid, paid, payout transactions                        |
+| `GET /v1/reporters/me/activity`       | session            | Your reports (live and expired, votes received, paid answers, earned), your votes |
+| `PUT /v1/reporters/me/payout-account` | session            | `{ accountId: "0.0.x" \| null }`; checked on the mirror node                      |
+| `GET /health`, `GET /health/live`     | none               | Readiness (Postgres, Arkiv, Hedera) and liveness                                  |
 
 Sessions are sent as `Authorization: Bearer <token>`. Errors share one shape:
 `{ statusCode, error, message, requestId }`, and every response carries an `x-request-id` header.

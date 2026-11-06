@@ -10,8 +10,8 @@ import {
   useMapEvents,
 } from 'react-leaflet';
 import { Earnings } from '../components/Earnings';
-import { VerifyHuman } from '../components/VerifyHuman';
-import { castVote, errorText, submitReport, voteBlocker, voterPosition } from '../lib/actions';
+import { SignInCard } from '../components/SignInCard';
+import { castVote, errorText, sessionVote, submitReport, voteBlocker, voterPosition } from '../lib/actions';
 import {
   type Activity,
   type AgentQuery,
@@ -22,7 +22,10 @@ import {
   type PayoutBatch,
 } from '../lib/api';
 import { type Level, LEVELS, MUMBAI_CENTER } from '../lib/levels';
+import { useMyVotes } from '../lib/myVotes';
+import { navigate } from '../lib/router';
 import { useSession } from '../lib/session';
+import { useTestLocation } from '../lib/testLocation';
 import { usePolling } from '../lib/usePolling';
 
 const MAX_AGE_MIN = 180;
@@ -42,7 +45,7 @@ type Point = { lat: number; lng: number };
 type Notice = { kind: 'ok' | 'error'; text: string; link?: string } | null;
 
 export function MapPage() {
-  const { session, setSession } = useSession();
+  const { session } = useSession();
   const reports = usePolling(
     () => api<LiveReports>(`/v1/reports?lat=${MUMBAI_CENTER[0]}&lng=${MUMBAI_CENTER[1]}&radius=20000`),
     10_000,
@@ -51,8 +54,14 @@ export function MapPage() {
 
   const [layers, setLayers] = useState({ live: true, simulated: true, queries: true });
   const [draft, setDraft] = useState<Point | null>(null);
-  const [flyTo, setFlyTo] = useState<Point | null>(null);
+  const [flyTo, setFlyTo] = useState<(Point & { zoom?: number }) | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const { location: here } = useTestLocation();
+
+  // Picking a test location in the top bar flies the map there.
+  useEffect(() => {
+    if (here) setFlyTo({ lat: here.lat, lng: here.lng, zoom: 14 });
+  }, [here]);
 
   const all = reports.data?.reports ?? [];
   const live = all.filter((r) => (r.source === 'simulated' ? layers.simulated : layers.live));
@@ -71,6 +80,26 @@ export function MapPage() {
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ClickToReport onClick={setDraft} />
+        {here && (
+          <>
+            <Circle
+              center={[here.lat, here.lng]}
+              radius={1000}
+              interactive={false}
+              pathOptions={{ color: '#1479c9', weight: 1.5, dashArray: '2 6', fillOpacity: 0.05 }}
+            />
+            <CircleMarker
+              center={[here.lat, here.lng]}
+              radius={7}
+              interactive={false}
+              pathOptions={{ color: '#fff', weight: 3, fillColor: '#1479c9', fillOpacity: 1 }}
+            >
+              <Tooltip permanent direction="top" offset={[0, -8]} className="here-label">
+                You (test location) · votes within 1 km
+              </Tooltip>
+            </CircleMarker>
+          </>
+        )}
         <FlyTo target={flyTo} />
 
         {layers.queries &&
@@ -146,9 +175,12 @@ export function MapPage() {
                 </span>
               </p>
               <Earnings session={session} />
+              <button className="link small" onClick={() => navigate('/me')}>
+                My activity: your reports, votes and earnings →
+              </button>
             </>
           ) : (
-            <VerifyHuman onVerified={setSession} />
+            <SignInCard why="Anyone can read the map. Sign in to report, confirm or dispute." />
           )}
           {notice && (
             <p className={`notice ${notice.kind} small`}>
@@ -269,10 +301,10 @@ function ClickToReport({ onClick }: { onClick: (p: Point) => void }) {
   return null;
 }
 
-function FlyTo({ target }: { target: Point | null }) {
+function FlyTo({ target }: { target: (Point & { zoom?: number }) | null }) {
   const map = useMap();
   useEffect(() => {
-    if (target) map.flyTo([target.lat, target.lng], 16, { duration: 0.8 });
+    if (target) map.flyTo([target.lat, target.lng], target.zoom ?? 16, { duration: 0.8 });
   }, [map, target]);
   return null;
 }
@@ -282,7 +314,9 @@ function ReportPopup({ report: r, onDone }: { report: LiveReport; onDone: (n: No
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Notice>(null);
   const info = levelInfo(r.level);
+  useMyVotes(); // re-render as soon as a vote is remembered
   const blocked = voteBlocker(session, r);
+  const voted = sessionVote(session, r);
 
   const vote = async (v: 'confirm' | 'dispute') => {
     if (!session) return;
@@ -333,14 +367,24 @@ function ReportPopup({ report: r, onDone }: { report: LiveReport; onDone: (n: No
         )}
       </div>
       <div className="popup-actions">
-        <button disabled={busy || !!blocked} onClick={() => vote('confirm')}>
-          Confirm
-        </button>
-        <button disabled={busy || !!blocked} onClick={() => vote('dispute')}>
-          Dispute
-        </button>
-        {blocked && <span className="muted small">{blocked}</span>}
-        {busy && <span className="muted small">Writing to Arkiv…</span>}
+        {busy ? (
+          <span className="muted small">Writing to Arkiv…</span>
+        ) : voted ? (
+          <span className={`vote-done ${voted}`}>
+            {voted === 'confirm' ? '✓ You confirmed' : voted === 'dispute' ? '✕ You disputed' : '✓ You voted'}
+          </span>
+        ) : blocked ? (
+          <span className="muted small">{blocked}</span>
+        ) : (
+          <>
+            <button className="vote-confirm" onClick={() => vote('confirm')}>
+              Confirm
+            </button>
+            <button className="vote-dispute" onClick={() => vote('dispute')}>
+              Dispute
+            </button>
+          </>
+        )}
       </div>
       {msg && <p className={`notice ${msg.kind} small`}>{msg.text}</p>}
     </div>
@@ -357,7 +401,11 @@ function DraftPopup({ at, onDone }: { at: Point; onDone: (n: Notice) => void }) 
     // A verified human's report must come from where they actually are.
     return (
       <p className="small">
-        Live reports use your real location. Open <a href="/report">Report</a> on your phone at the spot.
+        Live reports come from where you stand: open{' '}
+        <button className="link" onClick={() => navigate('/report')}>
+          Report
+        </button>{' '}
+        at the spot (while testing, pick a test location in the top bar).
       </p>
     );
   }

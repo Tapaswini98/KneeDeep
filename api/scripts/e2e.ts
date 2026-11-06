@@ -196,12 +196,12 @@ async function main() {
     assert(status === 200 && b.ok, `health not ok: ${JSON.stringify(body)}`);
     return `tier ${b.env}, ${b.arkiv.detail?.split(',')[0]}`;
   });
-  await check('Web app is served (map and reporter page)', async () => {
-    for (const path of ['/', '/report']) {
+  await check('Web app is served (home, map, report, my activity)', async () => {
+    for (const path of ['/', '/map', '/report', '/me']) {
       const { status, headers } = await http(path);
       assert(status === 200 && headers.get('content-type')?.includes('text/html'), `${path} -> ${status}`);
     }
-    return '/ and /report';
+    return '/, /map, /report, /me';
   });
   await check('Catalog advertises the paid endpoint and its price', async () => {
     const { body } = await http('/v1');
@@ -459,8 +459,10 @@ async function main() {
   );
   console.log(`
 Now try it by hand:
-  Map              ${BASE}
+  Home             ${BASE}
+  Live map         ${BASE}/map
   Reporter page    ${BASE}/report
+  My activity      ${BASE}/me
   1. Click "Verify you are human with World ID"${config.WORLD_ENVIRONMENT === 'staging' ? ' (simulator: https://simulator.worldcoin.org, give the identity an Orb credential, paste the QR link)' : ' and scan with World App'}.
   2. Report from your location; confirm or dispute a nearby report on the map.
   3. Watch the agent's queries and HashScan links in the map's side panel.
