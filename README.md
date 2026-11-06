@@ -301,6 +301,20 @@ Known gaps: no Content-Security-Policy yet (the map tiles and World ID bridge ne
 rate limits are per process (use a shared store when running several replicas); no integration tests
 against a live Arkiv or Hedera node in CI.
 
+## Deploy
+
+One Docker image (the API serves the web app) plus Postgres, behind HTTPS. Full guide:
+[docs/DEPLOY.md](docs/DEPLOY.md).
+
+```bash
+npm run deploy:check -- --env deploy/.env                          # config, secrets, funding
+cd deploy && cp .env.example .env && docker compose up -d --build  # one server: Caddy HTTPS + app + Postgres
+npm run deploy:check -- --env deploy/.env --url https://your-domain   # verify the live deployment
+```
+
+Or a managed setup with the [Render blueprint](render.yaml). Images are published to GitHub Container
+Registry by [.github/workflows/release.yml](.github/workflows/release.yml).
+
 ## Development
 
 | Command               | What                                          |

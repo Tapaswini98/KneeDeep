@@ -1,0 +1,7 @@
+# HTTPS for $DOMAIN with a certificate from Let's Encrypt, renewed automatically.
+# The DNS A/AAAA record for $DOMAIN must point at this server, with ports 80 and 443 open.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+	header -Server
+}

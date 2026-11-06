@@ -17,7 +17,8 @@
     "arkiv:query": "tsx scripts/arkiv-query.ts",
     "e2e": "tsx scripts/e2e.ts",
     "seed": "tsx scripts/seed.ts",
-    "payout": "tsx scripts/payout.ts"
+    "payout": "tsx scripts/payout.ts",
+    "preflight": "tsx scripts/preflight.ts"
   },
   "dependencies": {
     "@arkiv-network/sdk": "1.0.1",

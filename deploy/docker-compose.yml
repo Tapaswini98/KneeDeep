@@ -1,0 +1,68 @@
+# KneeDeep on one server: Caddy (automatic HTTPS) -> app (API + web) -> Postgres (private).
+# Full guide: docs/DEPLOY.md
+#
+#   cd deploy
+#   cp .env.example .env            # fill it in (secrets stay on the server)
+#   docker compose up -d --build    # build from this checkout, or set KNEEDEEP_IMAGE and `docker compose pull`
+#   docker compose logs -f app
+name: kneedeep
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kneedeep
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: kneedeep
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kneedeep']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    # No published port: only the app can reach the database.
+
+  app:
+    # Built from this checkout by default; set KNEEDEEP_IMAGE=ghcr.io/<owner>/kneedeep:<tag> to run a
+    # published release instead (docker compose pull app && docker compose up -d --no-build).
+    image: ${KNEEDEEP_IMAGE:-kneedeep:local}
+    build: ..
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://kneedeep:${POSTGRES_PASSWORD}@postgres:5432/kneedeep
+      PORT: '3000'
+      MIGRATE_ON_BOOT: 'true'
+      # Caddy is the one proxy in front: trust its X-Forwarded-For for client IPs (rate limits).
+      TRUST_PROXY: '1'
+    expose:
+      - '3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '5' }
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

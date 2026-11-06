@@ -2,7 +2,12 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+# Secrets: every env file except the documented templates.
 .env
-.env.local
+.env.*
+!.env.example
+!.env.production.example
+backups/
+deploy/backups/
 .DS_Store
 *.log

@@ -14,6 +14,10 @@ COPY web web
 RUN npm run build -w web && npm run build -w api
 
 FROM node:22-alpine
+LABEL org.opencontainers.image.title="KneeDeep" \
+      org.opencontainers.image.description="Street-level truth for AI agents: verified, perishable, paid." \
+      org.opencontainers.image.source="https://github.com/Tapaswini98/KneeDeep" \
+      org.opencontainers.image.licenses="MIT"
 # NODE_ENV is the runtime switch; APP_ENV the deployment tier (compose sets staging).
 ENV NODE_ENV=production APP_ENV=production
 WORKDIR /app
@@ -27,6 +31,8 @@ COPY --from=build /app/api/db api/db
 COPY --from=build /app/web/dist web/dist
 USER node
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-  CMD wget -qO- http://127.0.0.1:3000/health/live || exit 1
+# Liveness only (/health checks external networks and must not restart a healthy container).
+# PORT may be set by the platform (e.g. Render); 3000 otherwise.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+  CMD wget -qO- http://127.0.0.1:${PORT:-3000}/health/live || exit 1
 CMD ["node", "api/dist/main.js"]

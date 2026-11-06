@@ -1,0 +1,65 @@
+# Render Blueprint: the KneeDeep image plus a managed Postgres, HTTPS on an onrender.com domain.
+# Render dashboard -> New -> Blueprint -> this repository. Secrets marked `sync: false` are asked
+# for once in the dashboard and never stored in git. Guide: docs/DEPLOY.md
+#
+# Use a paid instance type for the web service: free services sleep when idle, which pauses the
+# payout schedule and makes the first agent query after a pause slow.
+
+services:
+  - type: web
+    name: kneedeep
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health/live
+    autoDeploy: true
+    envVars:
+      # Tier: staging = World ID simulator + testnets; production = real World App.
+      - key: APP_ENV
+        value: staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kneedeep-db
+          property: connectionString
+      - key: MIGRATE_ON_BOOT
+        value: 'true'
+      - key: TRUST_PROXY
+        value: '1'
+      # Generated once and kept: never change it (it would give every reporter a new identity).
+      - key: PSEUDONYM_SALT
+        generateValue: true
+
+      - key: WORLD_ENVIRONMENT
+        value: staging
+      - key: WORLD_ACTION
+        value: submit-report
+      - key: WORLD_APP_ID
+        sync: false
+      - key: WORLD_RP_ID
+        sync: false
+      - key: WORLD_RP_SIGNING_KEY
+        sync: false
+
+      - key: ARKIV_ACCESS_KEY
+        sync: false
+      - key: ARKIV_PRIVATE_KEY
+        sync: false
+
+      - key: HEDERA_NETWORK
+        value: hedera:testnet
+      - key: HEDERA_ACCOUNT_ID
+        sync: false
+      - key: HEDERA_PRIVATE_KEY
+        sync: false
+      - key: HEDERA_KEY_TYPE
+        value: ECDSA
+      - key: FACILITATOR_URL
+        value: https://api.testnet.blocky402.com
+      - key: PAYOUT_INTERVAL_MINUTES
+        value: '60'
+
+databases:
+  - name: kneedeep-db
+    databaseName: kneedeep
+    user: kneedeep
+    # Render's internal connection string needs no SSL settings.
+    ipAllowList: []
