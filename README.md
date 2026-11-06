@@ -29,6 +29,8 @@ flowchart LR
   ARK -- live evidence --> F
   A[Dispatch agent<br/>own Hedera key] -- GET /v1/conditions --> P
   P -- verify / settle --> FAC[Facilitator] --> H[(Hedera testnet)]
+  API -- batched payout, 70% of revenue --> H
+  H -- HBAR --> R
   API --- PG[(Postgres<br/>rate limits, queries, earnings)]
   M[Live map] -- free reads --> API
 ```
@@ -41,8 +43,11 @@ flowchart LR
 3. **Query and pay.** An agent calls `GET /v1/conditions?lat&lng&radius`, gets `402`, pays 0.1 HBAR via
    x402 on Hedera with no human approval, and receives a level per cell with a confidence score and the
    evidence behind it.
-4. **Earn** _(in progress)_. Reporters whose corroborated reports were used in paid answers are paid in
-   one batched Hedera transfer. Each paid query already records which reports it used.
+4. **Decide.** The dispatch agent pays for every checkpoint on both candidate routes and takes the safer
+   one, explaining why (knee-deep or worse is impassable for a scooter; no data is never "dry").
+5. **Earn.** 70% of every paid query is credited to the verified humans whose live reports it used, if
+   another verified human corroborated them. Earnings go out in **one batched Hedera transfer** to every
+   reporter's own account. Simulated data never earns.
 
 Design rationale (expiry, confidence formula, anti-gaming, privacy): [docs/design.md](docs/design.md).
 
@@ -80,7 +85,7 @@ The container runs as the **staging** tier: production build and strict checks (
 required, dev identities refused), with World ID on the simulator and testnets. A `STAGING` badge shows in
 the header. Use `DOCKER_APP_ENV=production npm run docker:up` for real World App only, or
 `DOCKER_APP_ENV=development` for the lenient tier. Tiers are described in `.env.example` (`APP_ENV`).
-Point the agent at the container with `KNEEDEEP_API_URL=http://localhost:8080 npm run agent`.
+Run the agent against the container with `npm run demo:agent` (it sets `KNEEDEEP_API_URL=http://localhost:8080`).
 
 ## Demo: one command
 
@@ -92,15 +97,16 @@ Builds and starts everything in Docker (Postgres + API + web app on http://local
 writes a **simulated monsoon evening** to Arkiv, then runs an end-to-end check against the real
 services and prints PASS/FAIL per step:
 
-| Area     | What is checked                                                                                                                                                                                                                         |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform | Readiness (Postgres, Arkiv, Hedera), web app served, catalog and price                                                                                                                                                                  |
-| World ID | Server-signed IDKit context; no session, a bot's dev identity and a forged proof (sent to World's verify API) are all refused, and nothing is written                                                                                   |
-| Arkiv    | Demo scenario written; the API serves it; the same data is readable straight from Arkiv                                                                                                                                                 |
-| Hedera   | Unpaid query gets 402; the agent pays with its own key and gets "knee, high" at Andheri; the mirror node confirms the settlement; the clear route reads dry; the dashboard shows the HashScan link; an invalid paid query costs nothing |
-| Expiry   | A report vanishes from Arkiv and the API when it expires, with no cleanup job (2-3 min)                                                                                                                                                 |
+| Area     | What is checked                                                                                                                                                                                                                                                         |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform | Readiness (Postgres, Arkiv, Hedera), web app served, catalog and price                                                                                                                                                                                                  |
+| World ID | Server-signed IDKit context; no session, a bot's dev identity and a forged proof (sent to World's verify API) are all refused, and nothing is written                                                                                                                   |
+| Arkiv    | Demo scenario written; the API serves it; the same data is readable straight from Arkiv                                                                                                                                                                                 |
+| Hedera   | Unpaid query gets 402; the agent pays with its own key and gets "knee, high" at Andheri; the mirror node confirms the settlement; simulated reports earn nothing; the clear route reads dry; the dashboard shows the HashScan link; an invalid paid query costs nothing |
+| Agent    | Pays for all 6 checkpoints on both routes and picks the dry Western Express Highway over flooded S.V. Road                                                                                                                                                              |
+| Expiry   | A report vanishes from Arkiv and the API when it expires, with no cleanup job (2-3 min)                                                                                                                                                                                 |
 
-It spends 0.2 testnet HBAR from the agent. Re-run checks only with `npm run demo:check`
+It spends 0.8 testnet HBAR from the agent (0.2 with `--quick`). Re-run checks only with `npm run demo:check`
 (`-- --quick` skips the expiry wait, `-- --no-seed` skips the scenario). Refresh the scenario alone with
 `npm run demo:seed`. The scenario follows the agent's two routes: S.V. Road via the subways is flooded
 (Khar ankle, Milan waist, Andheri knee), the Western Express Highway is dry. Every entry is labelled
@@ -113,7 +119,7 @@ write is labelled simulated.
 
 ```bash
 npm run simulate              # 3 knee-deep reports at Andheri subway, 1 confirmation, 1 ankle report
-npm run agent                 # discovers the API, pays via x402, prints the answer + HashScan link
+npm run agent                 # pays for 6 checkpoints on 2 routes via x402, picks the safer route
 ```
 
 On the map: click a marker to confirm or dispute it, click anywhere to report there, click an agent query
@@ -127,23 +133,44 @@ to fly to it. Every report links to its entity on the Arkiv explorer.
 - _World App:_ `WORLD_ENVIRONMENT=production`, then scan the QR with World App.
 - If World App returns a legacy 3.0 proof (the error says so), set `WORLD_ALLOW_LEGACY_PROOFS=true`.
 
+**Confirm and dispute from anywhere.** Votes need you within 1 km of the report, using the browser's
+real location. To test remotely, override it in Chrome DevTools: ⋮ → More tools → **Sensors** →
+Location → Other, e.g. `19.1197, 72.8464` (Andheri subway), and keep DevTools open. You cannot vote on
+your own report, so vote on the seeded ones (`npm run demo:seed`) or use a second simulator identity in
+another browser profile.
+
+**Reporter payouts end to end** (two World ID simulator identities, A and B, in two browser profiles,
+both with the Sensors location set to Andheri subway):
+
+1. A and B each verify, open `/report`, share location and report **Knee** (or B confirms A's report).
+   Two live humans agreeing makes both reports corroborated.
+2. Each adds a Hedera testnet account under **Your earnings** (any account that is not the platform's).
+3. `npm run demo:agent`: the agent pays for Andheri subway (and 5 other checkpoints). Each paid answer
+   that used A's and B's reports credits them 70% of 0.1 HBAR, split equally: "owed" goes up.
+4. `npm run payout`: one Hedera transfer pays both. The HashScan link appears in the CLI, under
+   **Your earnings** and in **Reporter payouts** on the map. Run it again: nothing is paid twice.
+
+The API also runs a batch every `PAYOUT_INTERVAL_MINUTES` (default 60; 0 = only on demand).
+
 **Truth expires.** Set `REPORT_TTL_SECONDS=120`, simulate, query, wait two minutes, query again: the answer
 becomes `"dataStatus": "empty"`.
 
 ## API
 
-| Endpoint                            | Auth               | What                                                                   |
-| ----------------------------------- | ------------------ | ---------------------------------------------------------------------- |
-| `GET /v1`                           | none               | Catalog: what is for sale and the price                                |
-| `GET /v1/conditions?lat&lng&radius` | **x402**, 0.1 HBAR | Fused level per ~150 m cell, confidence, and the inputs behind it      |
-| `GET /v1/reports?lat&lng&radius`    | none               | Raw live reports with votes, expiry and Arkiv links                    |
-| `GET /v1/activity`                  | none               | Recent agent queries: answer, payment, HashScan link                   |
-| `GET /v1/identity/context`          | none               | Signed IDKit request context (the RP signing key stays on the server)  |
-| `POST /v1/identity/session`         | proof              | Exchange a World ID Proof of Human for a reporter session: `{ proof }` |
-| `GET /v1/identity/me`               | session            | Whether a stored session is still valid                                |
-| `POST /v1/reports`                  | session            | Submit a report: `{ level, lat, lng }`                                 |
-| `POST /v1/reports/:key/votes`       | session            | Confirm or dispute: `{ vote, lat, lng }`; within 1 km, once per report |
-| `GET /health`, `GET /health/live`   | none               | Readiness (Postgres, Arkiv, Hedera) and liveness                       |
+| Endpoint                              | Auth               | What                                                                   |
+| ------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
+| `GET /v1`                             | none               | Catalog: what is for sale and the price                                |
+| `GET /v1/conditions?lat&lng&radius`   | **x402**, 0.1 HBAR | Fused level per ~150 m cell, confidence, and the inputs behind it      |
+| `GET /v1/reports?lat&lng&radius`      | none               | Raw live reports with votes, expiry and Arkiv links                    |
+| `GET /v1/activity`                    | none               | Recent agent queries (answer, payment, HashScan) and reporter payouts  |
+| `GET /v1/identity/context`            | none               | Signed IDKit request context (the RP signing key stays on the server)  |
+| `POST /v1/identity/session`           | proof              | Exchange a World ID Proof of Human for a reporter session: `{ proof }` |
+| `GET /v1/identity/me`                 | session            | Whether a stored session is still valid                                |
+| `POST /v1/reports`                    | session            | Submit a report: `{ level, lat, lng }`                                 |
+| `POST /v1/reports/:key/votes`         | session            | Confirm or dispute: `{ vote, lat, lng }`; within 1 km, once per report |
+| `GET /v1/reporters/me`                | session            | Your earnings: owed, being paid, paid, payout transactions             |
+| `PUT /v1/reporters/me/payout-account` | session            | `{ accountId: "0.0.x" \| null }`; checked on the mirror node           |
+| `GET /health`, `GET /health/live`     | none               | Readiness (Postgres, Arkiv, Hedera) and liveness                       |
 
 Sessions are sent as `Authorization: Bearer <token>`. Errors share one shape:
 `{ statusCode, error, message, requestId }`, and every response carries an `x-request-id` header.
@@ -193,6 +220,31 @@ agent                         KneeDeep API                       facilitator (Bl
   (`AGENT_MAX_TINYBARS_PER_QUERY`) bounds what it will sign.
 - If the API answers 4xx/5xx, settlement is cancelled: invalid queries are never charged.
 - Every paid query is stored with its settled Hedera transaction id.
+- The agent also has a per-trip budget (`AGENT_MAX_TINYBARS_PER_TRIP`): it prices the whole trip from
+  the catalog and refuses to start if checking every checkpoint would exceed it.
+
+### Reporter payouts
+
+```
+paid query settles ──> credit 70% to its earning reporters (same DB transaction as "paid")
+payout batch:  lock ─> resolve any batch still in flight (mirror node, by tx id)
+               ─> plan: unpaid earnings per payout account (≥ PAYOUT_MIN_TINYBARS, ≤ 9 accounts)
+               ─> COMMIT batch row + pre-generated Hedera tx id + claimed earnings
+               ─> ONE TransferTransaction: platform −total, each reporter +amount, memo = batch id
+               ─> receipt SUCCESS: settled · definite failure: released to the next batch
+```
+
+- **Who earns:** a live report (World ID verified), used in a paid answer, corroborated by another live
+  human (a matching report or a confirmation). Each human is credited once per query; rounding dust stays
+  with the platform. Unpaid queries credit no one. Simulated data never earns and never makes a live
+  report earn.
+- **Idempotent by batch id:** the batch and its Hedera transaction id are committed before anything is
+  sent, so a crash or timeout leaves a record that is resolved from the mirror node before any new batch.
+  A transaction the network never saw within its 120 s validity window can never execute, so its
+  earnings are safely released. A Postgres advisory lock serialises the API's schedule and
+  `npm run payout`; at most one batch can be in flight (unique index).
+- **Payout accounts** are checked on the mirror node (exists, not deleted, no receiver signature
+  required) so one bad account cannot fail every batch.
 
 ## Data on Arkiv
 
@@ -226,18 +278,18 @@ the integration debrief: [docs/WORLD_DEBRIEF.md](docs/WORLD_DEBRIEF.md).
 
 ## Production readiness
 
-| Concern       | What is in place                                                                                                                                                                                      |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Configuration | Validated at boot (zod). Deployment tiers (`APP_ENV`): in staging and production the API refuses dev identities, placeholder secrets or missing keys; production also refuses the World ID simulator. |
-| Security      | Helmet headers, CORS allowlist, 64 KB body limit, per-IP rate limits (tighter on identity and writes), RP signing key server-only, no internals in error bodies.                                      |
-| Abuse         | World ID uniqueness, one report per human per cell per 30 min (race-free reservation), one vote per human per report, votes only from within 1 km.                                                    |
-| Correctness   | Reports and votes reserve a Postgres row before the Arkiv write and release it on failure; Arkiv writes are serialised per wallet (nonce safety); settled payments are recorded idempotently.         |
-| Observability | Request ids on every response and log line; one log line per request; readiness and liveness endpoints.                                                                                               |
-| Deployment    | One Docker image: the API serves the built web app. Migrations run on boot (`MIGRATE_ON_BOOT=true`) under an advisory lock.                                                                           |
-| Quality       | 59 unit tests (fusion, identity, sessions, report/vote rules, config, geo), ESLint, Prettier, CI on every push.                                                                                       |
+| Concern       | What is in place                                                                                                                                                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Configuration | Validated at boot (zod). Deployment tiers (`APP_ENV`): in staging and production the API refuses dev identities, placeholder secrets or missing keys; production also refuses the World ID simulator.                                                |
+| Security      | Helmet headers, CORS allowlist, 64 KB body limit, per-IP rate limits (tighter on identity and writes), RP signing key server-only, no internals in error bodies.                                                                                     |
+| Abuse         | World ID uniqueness, one report per human per cell per 30 min (race-free reservation), one vote per human per report, votes only from within 1 km.                                                                                                   |
+| Correctness   | Reports and votes reserve a Postgres row before the Arkiv write and release it on failure; Arkiv writes are serialised per wallet (nonce safety); settled payments are recorded idempotently; payout batches are idempotent by batch id (see above). |
+| Observability | Request ids on every response and log line; one log line per request; readiness and liveness endpoints.                                                                                                                                              |
+| Deployment    | One Docker image: the API serves the built web app. Migrations run on boot (`MIGRATE_ON_BOOT=true`) under an advisory lock.                                                                                                                          |
+| Quality       | 84 unit tests (fusion, payout eligibility and arithmetic, identity, sessions, report/vote rules, config, geo, agent routing), ESLint, Prettier, CI on every push.                                                                                    |
 
 ```bash
-docker compose --profile app up --build      # Postgres + the app on http://localhost:8080
+npm run docker:up      # Postgres + the app on http://localhost:8080 (staging tier); npm run docker:down
 ```
 
 Known gaps: no Content-Security-Policy yet (the map tiles and World ID bridge need a tested policy);
@@ -246,24 +298,25 @@ against a live Arkiv or Hedera node in CI.
 
 ## Development
 
-| Command               | What                                         |
-| --------------------- | -------------------------------------------- |
-| `npm run dev`         | API (watch) + web                            |
-| `npm test`            | Unit tests                                   |
-| `npm run lint`        | ESLint                                       |
-| `npm run format`      | Prettier                                     |
-| `npm run typecheck`   | TypeScript across api, web, agent            |
-| `npm run build`       | Production builds                            |
-| `npm run db:migrate`  | Apply migrations (`db:reset` drops all, dev) |
-| `npm run simulate`    | Simulated reports through the API (dev mode) |
-| `npm run agent`       | Paying dispatch agent                        |
-| `npm run arkiv:query` | Read live data straight from Arkiv           |
+| Command               | What                                          |
+| --------------------- | --------------------------------------------- |
+| `npm run dev`         | API (watch) + web                             |
+| `npm test`            | Unit tests                                    |
+| `npm run lint`        | ESLint                                        |
+| `npm run format`      | Prettier                                      |
+| `npm run typecheck`   | TypeScript across api, web, agent             |
+| `npm run build`       | Production builds                             |
+| `npm run db:migrate`  | Apply migrations (`db:reset` drops all, dev)  |
+| `npm run simulate`    | Simulated reports through the API (dev mode)  |
+| `npm run agent`       | Paying dispatch agent (`demo:agent` = Docker) |
+| `npm run payout`      | Run one reporter payout batch now             |
+| `npm run arkiv:query` | Read live data straight from Arkiv            |
 
 | Folder            | What                                                                        |
 | ----------------- | --------------------------------------------------------------------------- |
 | [`api/`](api)     | NestJS API: identity, reports, votes, fusion engine, x402 paywall, activity |
 | [`web/`](web)     | Vite + React: live map dashboard and mobile reporter page (Leaflet + OSM)   |
-| [`agent/`](agent) | Deterministic dispatch agent that discovers, pays for and reads conditions  |
+| [`agent/`](agent) | Deterministic dispatch agent: pays per checkpoint, picks the safer route    |
 | [`arkiv/`](arkiv) | Arkiv submission notes: schema, friction log                                |
 | [`docs/`](docs)   | Design decisions, World debrief, AI usage                                   |
 
@@ -271,6 +324,8 @@ against a live Arkiv or Hedera node in CI.
 
 - Locations are coarsened to geohash cells (~150 m) on the server; raw GPS is never stored or published.
 - Public reporter IDs are `sha256(salt ‖ nullifier)`. The World ID nullifier is never stored.
+- Payouts are public Hedera transfers. A reporter's payout account is stored next to their pseudonym and
+  never published with their reports, but anyone can see that the account receives KneeDeep payouts.
 
 ## Limitations
 
@@ -278,6 +333,9 @@ against a live Arkiv or Hedera node in CI.
 - World ID proves uniqueness, not truth: a verified human can still lie once. Corroboration and paying
   only for corroborated reports reduce the incentive; reporter reputation is future work.
 - The backend writes to Arkiv on reporters' behalf, so reporters don't own their entries.
+- One Hedera transfer carries at most 10 HBAR movements, so a batch pays up to 9 reporters (largest
+  balances first); the rest wait for the next batch.
+- Confirmations corroborate a report (so its author earns) but the confirmer is not paid for voting.
 
 ## Related work
 

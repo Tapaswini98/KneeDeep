@@ -16,7 +16,8 @@
     "simulate": "tsx scripts/simulate.ts",
     "arkiv:query": "tsx scripts/arkiv-query.ts",
     "e2e": "tsx scripts/e2e.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "payout": "tsx scripts/payout.ts"
   },
   "dependencies": {
     "@arkiv-network/sdk": "1.0.1",

@@ -15,6 +15,8 @@ import { asc } from '@arkiv-network/sdk/query';
 import { u64 } from '@arkiv-network/sdk/schema';
 import { Client } from 'pg';
 import { KneeDeepClient } from '../../agent/src/kneedeep';
+import { planTrip } from '../../agent/src/planner';
+import { ROUTES } from '../../agent/src/routes';
 import { arkivPublicClient, arkivWalletClient } from '../src/arkiv/client';
 import { Reports } from '../src/arkiv/schemas';
 import { readConfig } from '../src/config/config';
@@ -90,6 +92,16 @@ async function countRows(table: 'report_index' | 'vote_index'): Promise<number> 
   await db.connect();
   try {
     return Number((await db.query(`SELECT count(*) FROM ${table}`)).rows[0].count);
+  } finally {
+    await db.end();
+  }
+}
+
+async function sql<T>(text: string, params: unknown[] = []): Promise<T[]> {
+  const db = new Client({ connectionString: config.DATABASE_URL });
+  await db.connect();
+  try {
+    return (await db.query(text, params)).rows as T[];
   } finally {
     await db.end();
   }
@@ -304,6 +316,7 @@ async function main() {
   });
 
   let paidTx: string | undefined;
+  let paidQueryId: string | undefined;
   let lastPaidTx: string | undefined;
   if (!agent) {
     await check('Agent pays and gets an answer', async () => {
@@ -322,7 +335,30 @@ async function main() {
         `seeded data must be labelled simulated, got ${answer.dataStatus}`,
       );
       paidTx = payment.txId;
+      paidQueryId = answer.queryId;
       return `knee, ${area.confidence} high: "${area.explanation}"`;
+    });
+    await check('Simulated reports never earn (reporter payouts)', async () => {
+      assert(paidQueryId, 'no paid query to inspect');
+      const simulated = [...new Set(REPORTS.map((r) => simPseudonym(r.who)))];
+      let paid = false;
+      for (let i = 0; i < 10 && !paid; i++) {
+        [{ paid }] = await sql<{ paid: boolean }>(
+          'SELECT paid_at IS NOT NULL AS paid FROM queries WHERE id = $1',
+          [paidQueryId],
+        );
+        if (!paid) await sleep(1_000);
+      }
+      assert(paid, 'query not recorded as paid');
+      const [row] = await sql<{ used: number; earning: number; credited: number }>(
+        `SELECT (SELECT count(*) FROM query_reports WHERE query_id = $1 AND reporter = ANY($2))::int AS used,
+                (SELECT count(*) FROM query_reports WHERE query_id = $1 AND reporter = ANY($2) AND earns)::int AS earning,
+                (SELECT count(*) FROM earnings WHERE query_id = $1 AND reporter = ANY($2))::int AS credited`,
+        [paidQueryId, simulated],
+      );
+      assert(row.used > 0, 'the answer used no simulated reports');
+      assert(row.earning === 0 && row.credited === 0, `${row.credited} simulated reporter(s) credited`);
+      return `${row.used} simulated reports used, 0 credited`;
     });
     await check('Hedera mirror node confirms the settlement', async () => {
       assert(paidTx, 'no payment to look up');
@@ -359,6 +395,21 @@ async function main() {
       const after = await latestTransfer(agentAccount!);
       assert(after === before, `a new agent transfer appeared: ${after}`);
       return 'Delhi query: 400, no transfer from the agent';
+    });
+  }
+
+  // -------------------------------------------------------------------------------------------
+  if (!QUICK && agent) {
+    section('The dispatch agent decides');
+    await check('It pays for every checkpoint on both routes and picks the dry one', async () => {
+      const plan = await planTrip(agent, ROUTES, { radiusM: 250, budgetTinybars: 100_000_000n });
+      const { choice } = plan.decision;
+      assert(
+        choice?.route.id === 'weh',
+        `expected the Western Express Highway, got ${choice?.route.id ?? 'hold'}`,
+      );
+      assert(plan.payments.length === 6, `expected 6 payments, got ${plan.payments.length}`);
+      return `${plan.payments.length} payments; "${plan.decision.explanation}"`;
     });
   }
 
@@ -413,6 +464,7 @@ Now try it by hand:
   1. Click "Verify you are human with World ID"${config.WORLD_ENVIRONMENT === 'staging' ? ' (simulator: https://simulator.worldcoin.org, give the identity an Orb credential, paste the QR link)' : ' and scan with World App'}.
   2. Report from your location; confirm or dispute a nearby report on the map.
   3. Watch the agent's queries and HashScan links in the map's side panel.
+  4. Route decision: npm run demo:agent    Reporter payouts: npm run payout
 `);
   if (failed.length) process.exit(1);
 }

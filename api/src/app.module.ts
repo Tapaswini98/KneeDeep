@@ -13,6 +13,7 @@ import { HealthController } from './health/health.controller';
 import { HederaModule } from './hedera/hedera.module';
 import { IdentityModule } from './identity/identity.module';
 import { PaymentsModule } from './payments/payments.module';
+import { PayoutsModule } from './payouts/payouts.module';
 import { ReportsModule } from './reports/reports.module';
 
 /** The built web app (npm run build -w web). When present, the API serves it: one origin, one deploy. */
@@ -40,6 +41,7 @@ function webApp(): DynamicModule[] {
     HederaModule,
     IdentityModule,
     PaymentsModule,
+    PayoutsModule,
     ReportsModule,
     ...webApp(),
   ],

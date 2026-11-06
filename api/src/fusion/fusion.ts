@@ -54,8 +54,13 @@ export interface UsedReport {
   source: Source;
   confirmations: number;
   disputes: number;
-  /** At least one other human agrees with this report's level. Only corroborated reports earn. */
+  /** At least one other human agrees with this report's level (reports or confirmations of any source). */
   corroborated: boolean;
+  /**
+   * Payout eligibility: a live report corroborated by at least one other LIVE human. Simulated data
+   * never earns, and never makes a live report earn.
+   */
+  earns: boolean;
 }
 
 export interface CellAnswer {
@@ -231,17 +236,20 @@ export function fuseCell(
   const used: UsedReport[] = kept
     .map((r) => {
       const rv = votesOn(r.key);
-      const sameLevelOthers = kept.some((o) => o.reporter !== r.reporter && o.level === r.level);
-      const confirmed = rv.some((v) => v.vote === 'confirm');
+      const agreeing = kept.filter((o) => o.reporter !== r.reporter && o.level === r.level);
+      const confirms = rv.filter((v) => v.vote === 'confirm');
+      const liveBacking =
+        agreeing.some((o) => o.source === 'live') || confirms.some((v) => v.source === 'live');
       return {
         key: r.key,
         reporter: r.reporter,
         level: r.level,
         ageMin: round(ageMin(now, r.reportedAt), 1),
         source: r.source,
-        confirmations: rv.filter((v) => v.vote === 'confirm').length,
+        confirmations: confirms.length,
         disputes: rv.filter((v) => v.vote === 'dispute').length,
-        corroborated: sameLevelOthers || confirmed,
+        corroborated: agreeing.length > 0 || confirms.length > 0,
+        earns: r.source === 'live' && liveBacking,
       };
     })
     .sort((a, b) => a.ageMin - b.ageMin);

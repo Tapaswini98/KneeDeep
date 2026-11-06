@@ -52,10 +52,13 @@ export class PaymentsService {
       priceTinybars: this.config.CONDITIONS_PRICE_TINYBARS,
       onSettled: async (queryId, s) => {
         try {
-          const updated = await this.queries.markPaid(queryId, s);
+          const paid = await this.queries.markPaid(queryId, s);
+          const credit = paid.credited
+            ? `, credited ${paid.credited} reporter(s) ${paid.eachTinybars} tinybars each`
+            : '';
           this.log.log(
             `Query ${queryId} paid by ${s.payer ?? 'unknown'}: ${hashscanTxUrl(s.network, s.txId)}` +
-              (updated ? '' : ' (already recorded)'),
+              (paid.recorded ? credit : ' (already recorded)'),
           );
         } catch (err) {
           // Funds already moved onchain; never fail the paid response over bookkeeping. Log loudly instead.

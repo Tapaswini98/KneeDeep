@@ -100,7 +100,20 @@ export interface AgentQuery {
   hashscan: string | null;
   reportsUsed: number;
   corroboratedUsed: number;
+  reportersCredited: number;
   summary: AreaSummary[];
+}
+
+export interface PayoutBatch {
+  id: string;
+  status: 'pending' | 'submitted' | 'settled' | 'failed';
+  txId: string | null;
+  totalTinybars: string;
+  recipients: number;
+  createdAt: string;
+  settledAt: string | null;
+  error: string | null;
+  hashscan: string | null;
 }
 
 export interface Activity {
@@ -108,6 +121,27 @@ export interface Activity {
   price: { network: string; amount: string; payTo: string } | null;
   totals: { paidQueries: number; revenueTinybars: string };
   queries: AgentQuery[];
+  payouts: {
+    reporterSharePercent: number;
+    paidOutTinybars: string;
+    owedTinybars: string;
+    batches: number;
+    recent: PayoutBatch[];
+  };
+}
+
+/** GET /v1/reporters/me: the signed-in reporter's earnings. Amounts are tinybars. */
+export interface ReporterEarnings {
+  reporter: string;
+  earns: boolean;
+  rule: string;
+  payoutAccount: string | null;
+  payoutAccountUrl: string | null;
+  queriesCredited: number;
+  owedTinybars: string;
+  inFlightTinybars: string;
+  paidTinybars: string;
+  payouts: { id: string; amountTinybars: string; settledAt: string | null; hashscan: string | null }[];
 }
 
 export const formatHbar = (tinybars: string | number) =>

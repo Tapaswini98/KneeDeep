@@ -9,6 +9,7 @@ import {
   useMap,
   useMapEvents,
 } from 'react-leaflet';
+import { Earnings } from '../components/Earnings';
 import { VerifyHuman } from '../components/VerifyHuman';
 import { castVote, errorText, submitReport, voteBlocker, voterPosition } from '../lib/actions';
 import {
@@ -18,6 +19,7 @@ import {
   formatHbar,
   type LiveReport,
   type LiveReports,
+  type PayoutBatch,
 } from '../lib/api';
 import { type Level, LEVELS, MUMBAI_CENTER } from '../lib/levels';
 import { useSession } from '../lib/session';
@@ -133,15 +135,18 @@ export function MapPage() {
         <section>
           <h3>You</h3>
           {session ? (
-            <p className="small">
-              {session.method === 'world' ? 'Verified human' : 'Dev identity (simulated)'} · reporter{' '}
-              <code>{session.reporter}</code>
-              <br />
-              <span className="muted">
-                Click a marker to confirm or dispute it.
-                {session.method === 'dev' ? ' Click anywhere on the map to report there.' : ''}
-              </span>
-            </p>
+            <>
+              <p className="small">
+                {session.method === 'world' ? 'Verified human' : 'Dev identity (simulated)'} · reporter{' '}
+                <code>{session.reporter}</code>
+                <br />
+                <span className="muted">
+                  Click a marker to confirm or dispute it.
+                  {session.method === 'dev' ? ' Click anywhere on the map to report there.' : ''}
+                </span>
+              </p>
+              <Earnings session={session} />
+            </>
           ) : (
             <VerifyHuman onVerified={setSession} />
           )}
@@ -170,7 +175,7 @@ export function MapPage() {
             </div>
             <div>
               <strong>{activity.data ? formatHbar(activity.data.totals.revenueTinybars) : '–'}</strong>
-              <span>earned</span>
+              <span>revenue</span>
             </div>
           </div>
           <p className="muted small">
@@ -219,6 +224,32 @@ export function MapPage() {
             ))}
           </ul>
           <p className="muted small">Markers fade with age and disappear when the report expires on Arkiv.</p>
+        </section>
+
+        <section>
+          <h3>Reporter payouts</h3>
+          <div className="stats">
+            <div>
+              <strong>{activity.data ? formatHbar(activity.data.payouts.paidOutTinybars) : '–'}</strong>
+              <span>paid to humans</span>
+            </div>
+            <div>
+              <strong>{activity.data ? formatHbar(activity.data.payouts.owedTinybars) : '–'}</strong>
+              <span>owed</span>
+            </div>
+            <div>
+              <strong>{activity.data?.payouts.batches ?? '–'}</strong>
+              <span>batches</span>
+            </div>
+          </div>
+          {(activity.data?.payouts.recent ?? []).map((p) => (
+            <PayoutRow key={p.id} p={p} />
+          ))}
+          <p className="muted small">
+            Verified reporters whose live reports another human corroborated share{' '}
+            {activity.data?.payouts.reporterSharePercent ?? '…'}% of each paid query, sent in one batched
+            Hedera transfer.
+          </p>
         </section>
 
         <section>
@@ -359,6 +390,29 @@ function DraftPopup({ at, onDone }: { at: Point; onDone: (n: Notice) => void }) 
   );
 }
 
+function PayoutRow({ p }: { p: PayoutBatch }) {
+  return (
+    <p className="small">
+      <span
+        className={`badge ${p.status === 'settled' ? 'paid' : p.status === 'failed' ? 'failed' : 'unpaid'}`}
+      >
+        {p.status}
+      </span>{' '}
+      {formatHbar(p.totalTinybars)} to {p.recipients} {p.recipients === 1 ? 'human' : 'humans'} ·{' '}
+      {timeAgo(p.settledAt ?? p.createdAt)}
+      {p.hashscan && (
+        <>
+          {' · '}
+          <a href={p.hashscan} target="_blank" rel="noreferrer">
+            HashScan
+          </a>
+        </>
+      )}
+      {p.error && <span className="muted"> · {p.error}</span>}
+    </p>
+  );
+}
+
 function QueryCard({ q, onSelect }: { q: AgentQuery; onSelect: () => void }) {
   const worst = q.summary[0];
   const info = levelInfo(worst?.level ?? null);
@@ -395,7 +449,8 @@ function QueryCard({ q, onSelect }: { q: AgentQuery; onSelect: () => void }) {
         </p>
       )}
       <p className="small muted">
-        {q.reportsUsed} report(s) used, {q.corroboratedUsed} corroborated · data: {q.dataStatus}
+        {q.reportsUsed} report(s) used, {q.corroboratedUsed} corroborated
+        {q.reportersCredited > 0 && `, ${q.reportersCredited} reporter(s) credited`} · data: {q.dataStatus}
         {q.hashscan && (
           <>
             {' · '}

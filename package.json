@@ -37,7 +37,9 @@
     "docker:logs": "docker compose logs -f app",
     "demo": "npm run docker:up && npm run demo:check",
     "demo:check": "npm run e2e -w api --",
-    "demo:seed": "npm run seed -w api"
+    "demo:seed": "npm run seed -w api",
+    "demo:agent": "KNEEDEEP_API_URL=${KNEEDEEP_API_URL:-http://localhost:8080} npm run agent",
+    "payout": "npm run payout -w api"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

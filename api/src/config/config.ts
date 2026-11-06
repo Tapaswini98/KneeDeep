@@ -68,6 +68,14 @@ const objectSchema = z.object({
   HEDERA_MIRROR_NODE_URL: z.string().url().default('https://testnet.mirrornode.hedera.com'),
   FACILITATOR_URL: z.string().url().default('https://api.testnet.blocky402.com'),
   CONDITIONS_PRICE_TINYBARS: z.coerce.bigint().positive().default(10_000_000n),
+  // Share of every paid query credited to the corroborated human reporters it used; the rest stays with the platform.
+  REPORTER_SHARE_PERCENT: z.coerce.number().int().min(0).max(100).default(70),
+  // Automatic payout batches every N minutes (0 = only on demand: npm run payout).
+  PAYOUT_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
+  // Accounts owed less than this wait for a later batch (keeps dust out of transfers).
+  PAYOUT_MIN_TINYBARS: z.coerce.bigint().positive().default(1_000_000n),
+  // Hedera allows 10 HBAR transfers per transaction: the platform debit plus up to 9 recipients.
+  PAYOUT_MAX_RECIPIENTS: z.coerce.number().int().min(1).max(9).default(9),
 
   WORLD_APP_ID: optional,
   WORLD_RP_ID: optional,

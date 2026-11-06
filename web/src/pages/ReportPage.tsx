@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Earnings } from '../components/Earnings';
 import { VerifyHuman } from '../components/VerifyHuman';
 import { castVote, currentPosition, errorText, submitReport, voteBlocker } from '../lib/actions';
 import { api, type LiveReport, type LiveReports } from '../lib/api';
@@ -142,6 +143,13 @@ export function ReportPage() {
             </a>
           )}
         </p>
+      )}
+
+      {session && (
+        <section className="nearby">
+          <h3>Your earnings</h3>
+          <Earnings session={session} />
+        </section>
       )}
 
       {position && (

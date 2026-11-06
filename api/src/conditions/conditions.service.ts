@@ -11,6 +11,8 @@ export interface UsedReportRef {
   key: string;
   reporter: string;
   corroborated: boolean;
+  /** Live and backed by another live human: this reporter is credited if the query is paid. */
+  earns: boolean;
 }
 
 const severity = (l: Level | null) => (l === null ? LEVELS.length : LEVELS.indexOf(l));
@@ -46,7 +48,12 @@ export class ConditionsService {
       cells.length === 0 ? 'empty' : sources.size === 1 ? ([...sources][0] as DataStatus) : 'mixed';
 
     const used: UsedReportRef[] = cells.flatMap(({ a }) =>
-      a.reports.map((r) => ({ key: r.key, reporter: r.reporter, corroborated: r.corroborated })),
+      a.reports.map((r) => ({
+        key: r.key,
+        reporter: r.reporter,
+        corroborated: r.corroborated,
+        earns: r.earns,
+      })),
     );
 
     const notices: string[] = [];
@@ -102,6 +109,7 @@ function toArea(a: CellAnswer, distanceM: number) {
       confirmations: r.confirmations,
       disputes: r.disputes,
       corroborated: r.corroborated,
+      earns: r.earns,
     })),
   };
 }

@@ -58,6 +58,8 @@ KneeDeep handles this in layers:
   and an advisory lock make this race-free even though Arkiv writes take seconds.
 - **Corroboration:** confidence grows only with _independent_ humans.
 - **Incentives:** only corroborated reports earn, so a lone false flood report earns nothing.
+  Corroboration for pay must come from another _live_ verified human: simulated data can neither
+  earn nor make a live report earn, and each human is credited once per paid query.
 - **Locality:** only people within 1 km of a report can confirm or dispute it.
 
 Honest limitation: a verified human can still lie once. Reporter reputation is future work.
@@ -84,3 +86,36 @@ payouts.
 
 Trade-off: the backend writes to Arkiv on reporters' behalf, which is simpler for the MVP, but
 reporters don't own their entries.
+
+## 7. Paying reporters: batched and idempotent
+
+70% (`REPORTER_SHARE_PERCENT`) of each paid query is credited, in the same database transaction
+that marks the query paid, to the humans whose earning reports the answer used. Credits are
+integers in tinybars, split equally; rounding dust stays with the platform.
+
+Payouts go out in batches, one Hedera `TransferTransaction` per batch (platform debit plus up to 9
+recipients, Hedera's 10-transfer limit), because one transfer per report would cost more in fees
+than many reports earn. The batch id is the idempotency key:
+
+1. A Postgres advisory lock lets only one run proceed (the API's schedule or `npm run payout`).
+2. Any batch still in flight is resolved first, from the mirror node, by its transaction id:
+   `SUCCESS` → settled; any other result, or not seen 180 s after submission (past the 120 s
+   validity window, so it can never execute) → failed, and its earnings are released.
+3. A new batch row, its pre-generated Hedera transaction id and the earnings it claims are
+   committed **before** the transfer is sent. A unique index allows only one batch in flight.
+4. Receipt `SUCCESS` → settled. A precheck or receipt failure is definite (no HBAR moved) →
+   failed and released. Anything else (timeout) stays in flight for step 2 of the next run.
+
+So an earning is in at most one batch, and no batch is ever paid twice.
+
+## 8. The agent's route decision
+
+Deterministic rules ([agent/src/decide.ts](../agent/src/decide.ts)) for a delivery scooter: dry is
+clear, ankle-deep is slow, knee-deep or worse is impassable, contested or no data is unknown
+(absence of reports is not evidence of a dry road). A route is as bad as its worst checkpoint.
+The agent never picks an impassable route; among the rest it picks the lowest risk, then the
+shortest, and holds the delivery if every route is impassable. Safety first: one unconfirmed
+report of deep water is enough to avoid a route when there is an alternative, and its confidence
+is always printed next to the decision. Spending is bounded twice: per query (the client refuses
+to sign above `AGENT_MAX_TINYBARS_PER_QUERY`) and per trip (it prices the trip from the catalog
+before paying anything).

@@ -165,3 +165,48 @@ describe('labels, sources and cells', () => {
     expect(answers.map((a) => a.cell).sort()).toEqual(['te7uc8t', 'te7uc8v']);
   });
 });
+
+describe('payout eligibility (earns)', () => {
+  const byReporter = (a: ReturnType<typeof fuseOne>, who: string) =>
+    a.reports.find((r) => r.reporter === who)!;
+
+  it('pays live reports that another live human agrees with', () => {
+    const a = fuseOne([report('a', 'knee', 10), report('b', 'knee', 5)]);
+    expect(byReporter(a, 'a').earns).toBe(true);
+    expect(byReporter(a, 'b').earns).toBe(true);
+  });
+
+  it('pays a live report confirmed by another live human, but not the confirmer', () => {
+    const r = report('a', 'knee', 10);
+    const a = fuseOne([r], [vote(r, 'b', 'confirm', 5)]);
+    expect(a.reports).toHaveLength(1);
+    expect(a.reports[0].earns).toBe(true);
+  });
+
+  it('never pays an uncorroborated report', () => {
+    expect(fuseOne([report('a', 'knee', 10)]).reports[0].earns).toBe(false);
+  });
+
+  it('never pays a report that others contradict rather than corroborate', () => {
+    const a = fuseOne([report('a', 'knee', 10), report('b', 'dry', 5)]);
+    expect(a.reports.every((r) => !r.earns)).toBe(true);
+  });
+
+  it('never pays simulated reports, even corroborated ones', () => {
+    const a = fuseOne([
+      report('a', 'knee', 10, { source: 'simulated' }),
+      report('b', 'knee', 5, { source: 'simulated' }),
+    ]);
+    expect(a.reports.every((r) => r.corroborated && !r.earns)).toBe(true);
+  });
+
+  it('does not let simulated data make a live report earn', () => {
+    const live = report('a', 'knee', 10);
+    const a = fuseOne(
+      [live, report('sim', 'knee', 5, { source: 'simulated' })],
+      [vote(live, 'sim2', 'confirm', 4, { source: 'simulated' })],
+    );
+    expect(byReporter(a, 'a').corroborated).toBe(true);
+    expect(byReporter(a, 'a').earns).toBe(false);
+  });
+});
