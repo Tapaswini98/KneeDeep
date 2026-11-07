@@ -3,7 +3,7 @@
 **Street-level truth for AI agents: verified, perishable, paid.**
 
 **Live:** [kneedeep.onrender.com](https://kneedeep.onrender.com) (testnets, World ID simulator) ·
-**Video:** _add the link after recording_ ·
+**Video:** [Loom demo](https://www.loom.com/share/eac3767b3c0f4e12b3341e63f162635b) ·
 **Independent verification:** [Chainlink CRE attestations on Sepolia](cre/README.md#live-on-sepolia)
 
 Weather APIs tell an agent it rained. KneeDeep tells it the Andheri subway is knee-deep _right now_,
