@@ -312,7 +312,7 @@ the integration debrief: [docs/WORLD_DEBRIEF.md](docs/WORLD_DEBRIEF.md).
 | Correctness   | Reports and votes reserve a Postgres row before the Arkiv write and release it on failure; Arkiv writes are serialised per wallet (nonce safety); settled payments are recorded idempotently; payout batches are idempotent by batch id (see above). |
 | Observability | Request ids on every response and log line; one log line per request; readiness and liveness endpoints.                                                                                                                                              |
 | Deployment    | One Docker image: the API serves the built web app. Migrations run on boot (`MIGRATE_ON_BOOT=true`) under an advisory lock.                                                                                                                          |
-| Quality       | 84 unit tests (fusion, payout eligibility and arithmetic, identity, sessions, report/vote rules, config, geo, agent routing), ESLint, Prettier, CI on every push.                                                                                    |
+| Quality       | 127 tests: 100 API unit tests (fusion, passability, coverage, payouts, identity, sessions, report/vote rules, trips, config, geo), 9 agent routing, 10 contract (Foundry), 8 CRE workflow; ESLint, Prettier, CI on every push.                       |
 
 ```bash
 npm run docker:up      # Postgres + the app on http://localhost:8080 (staging tier); npm run docker:down
